@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<phpunit bootstrap="unit-tests/bootstrap.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="activation">
+			<directory prefix="test-" suffix=".php">unit-tests/tests/</directory>
+			<exclude>./tests/test-sample.php</exclude>
+		</testsuite>
+    </testsuites>
+    <groups>
+        <exclude>
+            <group>skipped</group>
+        </exclude>
+    </groups>
+</phpunit>

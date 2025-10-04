@@ -1,0 +1,42 @@
+{
+  "plugins": [
+    {
+      "file": "query-monitor/query-monitor.php",
+      "required": true,
+      "version": ">=3.14.0",
+      "order": 10
+    }
+  ],
+
+  "filtered": [
+    {
+      "hook": "init",
+      "priority": 10,
+      "plugins": [
+        "query-monitor/query-monitor.php"
+      ]
+    }
+  ],
+
+  "settings": [
+    {
+      "field": "enable_query_monitor",
+      "operator": "equals",
+      "value": "1",
+      "plugins": [
+        "query-monitor/query-monitor.php"
+      ]
+    }
+  ],
+
+  "deactivate": [
+    "old-debug-plugin/old-debug.php"
+  ],
+
+  "groups": {
+    "staging": [
+      "query-monitor/query-monitor.php"
+    ],
+    "production": []
+  }
+}

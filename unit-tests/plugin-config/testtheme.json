@@ -1,0 +1,26 @@
+{
+	"plugins":[
+	   "advanced-responsive-video-embedder\/advanced-responsive-video-embedder.php",
+	   "brightcove-video-connect\/brightcove-video-connect.php",
+	   "jquery-collapse-o-matic\/collapse-o-matic.php",
+	   "column-shortcodes\/column-shortcodes.php",
+	   "contact-form-7\/wp-contact-form-7.php"
+	
+	],
+	"filtered":{
+	   "filter":{
+		  "plugins_loaded":[
+			 "advanced-custom-fields-pro\/acf.php"
+		  ]
+	   }
+	},
+	"settings":[
+	   {
+		  "field":"blogname",
+		  "value":"News Academy",
+		  "plugins":[
+			 
+		  ]
+	   }
+	]
+ }
