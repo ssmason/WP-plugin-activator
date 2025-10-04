@@ -102,7 +102,7 @@ class Activate {
  
 		//$this->network_activation(); 
 		$this->theme_activation();
-		// $this->filter_activation();
+		$this->filter_activation();
 		// $this->settings_activation();
 		return true;
 	}
@@ -299,4 +299,51 @@ class Activate {
 			}
 		}
 	}
+
+	/**
+	 * Activate plugins on specific WordPress hooks based on the "filtered" configuration.
+	 * Each entry specifies a hook, optional priority, and plugins to activate when that hook fires.
+	 * Logs any misconfigured entries for easier debugging.
+	 * 
+	 * @return void
+	*/
+	private function filter_activation(): void {
+		if ( empty( $this->get_keys()['filtered'] ) || ! is_array( $this->get_keys()['filtered'] ) ) {
+			return;
+		}
+
+		foreach ( $this->get_keys()['filtered'] as $entry ) {
+			$hook     = $entry['hook']    ?? null;
+			$plugins  = $entry['plugins'] ?? [];
+			$priority = isset( $entry['priority'] ) ? (int) $entry['priority'] : 10;
+
+			// Basic validation
+			if ( empty( $hook ) || empty( $plugins ) || ! is_array( $plugins ) ) {
+				error_log(
+					sprintf(
+						'[PluginActivator] Invalid filtered activation entry detected: %s',
+						wp_json_encode( $entry )
+					)
+				);
+				continue;
+			}
+
+			add_action(
+				$hook,
+				function() use ( $plugins, $hook ) {
+					$this->activate_plugins( $plugins );
+
+					error_log(
+						sprintf(
+							'[PluginActivator] Filtered activation triggered on hook "%s" for plugins: %s',
+							$hook,
+							implode( ', ', $plugins )
+						)
+					);
+				},
+				$priority
+			);
+		}
+	}
+
 }
