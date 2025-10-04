@@ -346,4 +346,90 @@ class Activate {
 		}
 	}
 
+	/**
+	 * Activate plugins conditionally based on WordPress option values,
+	 * according to the "settings" configuration in the JSON file.
+	 * Supports basic operators: equals, not_equals, contains, not_empty.
+	 * 
+	 * @return void
+	*/
+	private function settings_activation(): void {
+		if ( empty( $this->get_keys()['settings'] ) || ! is_array( $this->get_keys()['settings'] ) ) {
+			return;
+		}
+
+		foreach ( $this->get_keys()['settings'] as $rule ) {
+			$field    = $rule['field']    ?? null;
+			$operator = $rule['operator'] ?? 'equals';
+			$value    = $rule['value']    ?? null;
+			$plugins  = $rule['plugins']  ?? [];
+
+			// Basic rule validation
+			if ( empty( $field ) || empty( $plugins ) || ! is_array( $plugins ) ) {
+				error_log(
+					sprintf(
+						'[PluginActivator] Invalid settings activation rule: %s',
+						wp_json_encode( $rule )
+					)
+				);
+				continue;
+			}
+
+			$current_value = get_option( $field );
+
+			$condition_met = false;
+			switch ( $operator ) {
+				case 'equals':
+					$condition_met = (string) $current_value === (string) $value;
+					break;
+
+				case 'not_equals':
+					$condition_met = (string) $current_value !== (string) $value;
+					break;
+
+				case 'contains':
+					if ( is_string( $current_value ) ) {
+						$condition_met = strpos( $current_value, (string) $value ) !== false;
+					} elseif ( is_array( $current_value ) ) {
+						$condition_met = in_array( $value, $current_value, true );
+					}
+					break;
+
+				case 'not_empty':
+					$condition_met = ! empty( $current_value );
+					break;
+
+				default:
+					error_log(
+						sprintf(
+							'[PluginActivator] Unsupported operator "%s" in settings rule for field "%s".',
+							$operator,
+							$field
+						)
+					);
+					break;
+			}
+
+			if ( $condition_met ) {
+				add_action(
+					'plugins_loaded',
+					function() use ( $plugins, $field, $operator, $value ) {
+						$this->activate_plugins( $plugins );
+						error_log(
+							sprintf(
+								'[PluginActivator] Settings activation triggered for field "%s" (operator: %s, value: %s) — activated plugins: %s',
+								$field,
+								$operator,
+								is_scalar( $value ) ? $value : wp_json_encode( $value ),
+								implode( ', ', $plugins )
+							)
+						);
+					},
+					10
+				);
+			}
+		}
+	}
+
+
 }
