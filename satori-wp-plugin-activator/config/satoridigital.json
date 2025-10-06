@@ -1,0 +1,42 @@
+{
+  "plugins": [
+    {
+      "file": "",
+      "required": true,
+      "version": ">=3.14.0",
+      "order": 10
+    }
+  ],
+
+  "filtered": [
+    {
+      "hook": "init",
+      "priority": 10,
+      "plugins": [
+        ""
+      ]
+    }
+  ],
+
+  "settings": [
+    {
+      "field": "enable_query_monitor",
+      "operator": "equals",
+      "value": "1",
+      "plugins": [
+        ""
+      ]
+    }
+  ],
+
+  "deactivate": [
+    "query-monitor/query-monitor.php"
+  ],
+
+  "groups": {
+    "staging": [
+      ""
+    ],
+    "production": []
+  }
+}

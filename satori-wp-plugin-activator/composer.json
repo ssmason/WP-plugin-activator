@@ -1,0 +1,31 @@
+{
+	"name": "satori-digital/wp-plugin-activator",
+	"type": "wordpress-plugin",
+	"description": "Allows activation of plugins in code for WordPress sites",
+	"authors": [
+		{
+			"name": "Stephen Mason",
+			"homepage": "https://satori-digital.com/"
+		}
+	], 
+	"require-dev": {
+		"squizlabs/php_codesniffer": "^2 || ^3 || 4.0.x-dev",
+		"automattic/vipwpcs": "2.2.0",
+		"dealerdirect/phpcodesniffer-composer-installer": "^0.7.0",
+		"wp-coding-standards/wpcs": "2.3.0"
+	},
+	"scripts": {
+		"php:lint": "vendor/bin/phpcs .",
+		"php:unit-test": "./vendor/bin/phpunit"
+	}, 
+	"autoload": {
+		"psr-4": {
+			"SatoriDigital\\PluginActivator\\": "src/"
+		}
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	}
+}
