@@ -26,7 +26,7 @@ class SettingsActivator implements ActivatorInterface {
 	 * @var array
 	*/
 	private array $config;
-
+ 
 	public function __construct( array $config ) {
 		$this->config = $config;
 	}
@@ -42,16 +42,17 @@ class SettingsActivator implements ActivatorInterface {
 	 * @return void
 	*/
 	public function activate(): void {
+
 		if ( empty( $this->config['settings'] ) || ! is_array( $this->config['settings'] ) ) {
 			return;
 		}
-
+		error_log('[ActivationUtils] running' );
+ 
 		foreach ( $this->config['settings'] as $rule ) {
 			$field    = $rule['field']    ?? null;
 			$operator = $rule['operator'] ?? 'equals';
 			$value    = $rule['value']    ?? null;
 			$plugins  = $rule['plugins']  ?? [];
-
 			// Basic rule validation
 			if ( empty( $field ) || empty( $plugins ) || ! is_array( $plugins ) ) {
 				error_log(
@@ -61,28 +62,13 @@ class SettingsActivator implements ActivatorInterface {
 					)
 				);
 				continue;
-			}
-
+			} 
 			$current_value = get_option( $field );
 			$condition_met = $this->evaluate_condition( $current_value, $operator, $value, $field );
-
 			if ( $condition_met ) {
-				add_action(
-					'plugins_loaded',
-					function() use ( $plugins, $field, $operator, $value ) {
-						ActivationUtils::activate_plugins( $plugins );
-						error_log(
-							sprintf(
-								'[PluginActivator] Settings activation triggered for field "%s" (operator: %s, value: %s) — activated plugins: %s',
-								$field,
-								$operator,
-								is_scalar( $value ) ? $value : wp_json_encode( $value ),
-								implode( ', ', $plugins )
-							)
-						);
-					},
-					10
-				);
+				ActivationUtils::activate_plugins( $plugins ); 
+			} else {
+				error_log( 'Condition not met for field '. $field . ' (operator: ' . $operator . ', value: ' . ( is_scalar( $value ) ? $value : wp_json_encode( $value ) ) . ')' );
 			}
 		}
 	}

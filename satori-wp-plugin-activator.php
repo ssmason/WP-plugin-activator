@@ -18,5 +18,9 @@ if ( file_exists( __DIR__ . '/satori-wp-plugin-activator/vendor/autoload.php' ) 
 use SatoriDigital\PluginActivator\Controllers\ActivationController;
 
 add_action( 'after_setup_theme', function() {
-	( new ActivationController() )->run();
+	if ( ! defined( 'SATORI_PLUGIN_ACTIVATOR_LOADED' ) ) {
+		define( 'SATORI_PLUGIN_ACTIVATOR_LOADED', true );
+		( new ActivationController() )->run();
+	}
 });
+

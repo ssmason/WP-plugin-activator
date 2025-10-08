@@ -52,31 +52,34 @@ class FilterActivator implements ActivatorInterface {
 			$plugins  = $entry['plugins'] ?? [];
 			$priority = isset( $entry['priority'] ) ? (int) $entry['priority'] : 10;
 
-			if ( empty( $hook ) || empty( $plugins ) || ! is_array( $plugins ) ) {
-				error_log(
-					sprintf(
-						'[PluginActivator] Invalid filtered activation entry: %s',
-						wp_json_encode( $entry )
-					)
-				);
-				continue;
-			}
-
-			add_action(
-				$hook,
-				function() use ( $plugins, $hook ) {
-					ActivationUtils::activate_plugins( $plugins );
-
+			if (! empty( $plugins) ) {
+				if ( empty( $hook ) || empty( $plugins ) || ! is_array( $plugins ) ) {
 					error_log(
 						sprintf(
-							'[PluginActivator] Filtered activation triggered on hook "%s" for plugins: %s',
-							$hook,
-							implode( ', ', $plugins )
+							'[PluginActivator] Invalid filtered activation entry: %s',
+							wp_json_encode( $entry )
 						)
 					);
-				},
-				$priority
-			);
+					continue;
+				}
+				add_action(
+					$hook,
+					function() use ( $plugins, $hook ) {
+						ActivationUtils::activate_plugins( $plugins );
+
+						error_log(
+							sprintf(
+								'[PluginActivator] Filtered activation triggered on hook "%s" for plugins: %s',
+								$hook,
+								implode( ', ', $plugins )
+							)
+						);
+					},
+					$priority
+				);
+			}
+
+			
 		}
 	}
 }

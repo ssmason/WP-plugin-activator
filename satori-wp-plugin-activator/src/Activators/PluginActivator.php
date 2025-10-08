@@ -49,18 +49,31 @@ class PluginActivator implements ActivatorInterface {
 	public function activate(): void {
 		$plan = $this->evaluate_plugins();
 
-		// Activate any plugins that need it
 		if ( ! empty( $plan['to_activate'] ) ) {
-			ActivationUtils::activate_plugins( $plan['to_activate'] );
-		}
+			$immediate = [];
+			$deferred  = [];
 
-		// Deactivate any plugins not listed in the config
-		$configured_plugins = $this->config['plugins'] ?? [];
+			foreach ( $plan['to_activate'] as $plugin ) {
+				if ( ! empty( $plugin['defer'] ) && $plugin['defer'] === true ) {
+					$deferred[] = $plugin;
+				} else {
+					$immediate[] = $plugin;
+				}
+			}
+			// Activate immediate plugins right away
+			if ( ! empty( $immediate ) ) {
+				ActivationUtils::activate_plugins( $immediate );
+			}
 
-		if ( ! empty( $configured_plugins ) && is_array( $configured_plugins ) ) {
-			ActivationUtils::deactivate_unlisted_plugins( $configured_plugins );
+			// Defer activation of others to plugins_loaded
+			if ( ! empty( $deferred ) ) {
+				add_action( 'plugins_loaded', function() use ( $deferred ) {
+					ActivationUtils::activate_plugins( $deferred );
+				}, 1 );
+			}
 		}
 	}
+
 
 	/**
 	 * Evaluate plugin configuration to determine which plugins need activation.

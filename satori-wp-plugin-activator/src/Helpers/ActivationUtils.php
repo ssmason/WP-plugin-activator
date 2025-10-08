@@ -33,20 +33,19 @@ class ActivationUtils {
 	 * @return void
 	 */
 	public static function activate_plugins( array $plugins ): void {
-		self::ensure_plugin_functions();
- 
-
+		self::ensure_plugin_functions(); 	
 		foreach ( $plugins as $plugin ) {
-			$slug = is_array( $plugin ) ? ( $plugin['file'] ?? '' ) : $plugin;
 
+			$slug = is_array( $plugin ) ? ( $plugin['file'] ?? '' ) : $plugin;
+			
 			if ( empty( $slug ) ) {
-				error_log( '[PluginActivator] Empty plugin slug detected during activation.' );
+				error_log( '[ActivationUtils] Empty plugin slug detected during activation.' );
 				continue;
 			}
 
 			if ( ! self::plugin_file_exists( $slug ) ) {
 				error_log(
-					sprintf( '[PluginActivator] Plugin file not found: %s', $slug )
+					sprintf( '[ActivationUtils] Plugin file not found: %s', $slug )
 				);
 				continue;
 			}

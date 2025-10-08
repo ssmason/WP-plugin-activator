@@ -15,6 +15,7 @@ use SatoriDigital\PluginActivator\Activators\FilterActivator;
 use SatoriDigital\PluginActivator\Activators\SettingsActivator;
 use SatoriDigital\PluginActivator\Helpers\ConfigLoader;
 use SatoriDigital\PluginActivator\Interfaces\ActivatorInterface;
+use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
 
 /**
@@ -38,7 +39,7 @@ class ActivationController {
 	 * @var array
 	*/
 	private array $config;
-
+ 	
 	/**
 	 * Controller constructor.
 	 * Loads configuration into an array $this->activators and initializes activators.
@@ -60,11 +61,31 @@ class ActivationController {
 	 * Main function that loops through the activators and calls ->activate()
 	*/
 	public function run(): void {
+
 		foreach ( $this->activators as $activator ) {
 			if ( $activator instanceof ActivatorInterface ) {
 				$activator->activate();
 			}
 		}
+
+		$configured_plugins = array_merge(
+			$this->config['plugins'] ?? [],
+			array_merge(
+				...array_map(
+					fn( $f ) => $f['plugins'] ?? [],
+					$this->config['filtered'] ?? []
+				)
+			),
+			array_merge(
+				...array_map(
+					fn( $s ) => $s['plugins'] ?? [],
+					$this->config['settings'] ?? []
+				)
+			)
+		);
+
+    	\SatoriDigital\PluginActivator\Helpers\ActivationUtils::deactivate_unlisted_plugins( $configured_plugins );
+
 	}
 }
 
