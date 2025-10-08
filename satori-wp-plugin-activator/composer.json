@@ -12,11 +12,19 @@
 		"squizlabs/php_codesniffer": "^2 || ^3 || 4.0.x-dev",
 		"automattic/vipwpcs": "2.2.0",
 		"dealerdirect/phpcodesniffer-composer-installer": "^0.7.0",
-		"wp-coding-standards/wpcs": "2.3.0"
+		"wp-coding-standards/wpcs": "2.3.0",
+		"wp-phpunit/wp-phpunit": "^6.8",
+		"yoast/phpunit-polyfills": "^4.0",
+		"vlucas/phpdotenv": "^5.6",
+		"phpunit/phpunit": "^9.6"
 	},
 	"scripts": {
 		"php:lint": "vendor/bin/phpcs .",
-		"php:unit-test": "./vendor/bin/phpunit"
+		"php:unit-test": "./vendor/bin/phpunit",
+		"install-wp-tests": [
+			"bash -c 'set -a; [ -f .env.testing ] && . ./.env.testing; set +a; WP_CORE_DIR=${WP_CORE_DIR:-$(pwd)/.wp-tests/wordpress} WP_TESTS_DIR=${WP_TESTS_DIR:-$(pwd)/.wp-tests/wp-tests-lib} bash tests/bin/install-wp-tests.sh ${WP_DB_NAME:-wordpress_test} ${WP_DB_USER:-root} \"${WP_DB_PASS:-}\" ${WP_DB_HOST:-localhost} ${WP_VERSION:-latest}'"
+		],
+		"test-plugin": "vendor/bin/phpunit"
 	}, 
 	"autoload": {
 		"psr-4": {
