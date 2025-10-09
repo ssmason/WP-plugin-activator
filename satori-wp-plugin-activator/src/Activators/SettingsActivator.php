@@ -46,13 +46,13 @@ class SettingsActivator implements ActivatorInterface {
 		if ( empty( $this->config['settings'] ) || ! is_array( $this->config['settings'] ) ) {
 			return;
 		}
-		error_log('[ActivationUtils] running' );
- 
+
 		foreach ( $this->config['settings'] as $rule ) {
 			$field    = $rule['field']    ?? null;
 			$operator = $rule['operator'] ?? 'equals';
 			$value    = $rule['value']    ?? null;
 			$plugins  = $rule['plugins']  ?? [];
+
 			// Basic rule validation
 			if ( empty( $field ) || empty( $plugins ) || ! is_array( $plugins ) ) {
 				error_log(
@@ -62,16 +62,44 @@ class SettingsActivator implements ActivatorInterface {
 					)
 				);
 				continue;
-			} 
+			}
+
 			$current_value = get_option( $field );
 			$condition_met = $this->evaluate_condition( $current_value, $operator, $value, $field );
+
 			if ( $condition_met ) {
-				ActivationUtils::activate_plugins( $plugins ); 
+				// Build a temporary config matching evaluate_plugins format
+				$temp_config = [ 'plugins' => [] ];
+				foreach ( $plugins as $plugin ) {
+					$temp_config['plugins'][] = is_array( $plugin ) ? $plugin : [ 'file' => $plugin ];
+				}
+
+				$plan = ActivationUtils::evaluate_plugins( $temp_config );
+
+				if ( ! empty( $plan['to_activate'] ) ) {
+					ActivationUtils::activate_plugins( $plan['to_activate'] );
+
+					error_log(
+						sprintf(
+							'[PluginActivator] Settings-based activation triggered for field "%s" — activated plugins: %s',
+							$field,
+							implode( ', ', $plan['to_activate'] )
+						)
+					);
+				}
 			} else {
-				error_log( 'Condition not met for field '. $field . ' (operator: ' . $operator . ', value: ' . ( is_scalar( $value ) ? $value : wp_json_encode( $value ) ) . ')' );
+				error_log(
+					sprintf(
+						'[PluginActivator] Condition not met for field "%s" (operator: %s, value: %s)',
+						$field,
+						$operator,
+						is_scalar( $value ) ? $value : wp_json_encode( $value )
+					)
+				);
 			}
 		}
 	}
+
 	/**
 	 * Evaluate a settings-based condition against the current option value.
 	 *

@@ -47,7 +47,7 @@ class PluginActivator implements ActivatorInterface {
 	 * @return void
 	 */
 	public function activate(): void {
-		$plan = $this->evaluate_plugins();
+		$plan = ActivationUtils::evaluate_plugins( $this->config);
 
 		if ( ! empty( $plan['to_activate'] ) ) {
 			$immediate = [];
@@ -73,82 +73,4 @@ class PluginActivator implements ActivatorInterface {
 			}
 		}
 	}
-
-
-	/**
-	 * Evaluate plugin configuration to determine which plugins need activation.
-	 *
-	 * Checks for plugin file existence, activation state, and version requirements.
-	 * Logs any missing files or version mismatches, and builds a plan of plugins
-	 * that should be activated.
-	 *
-	 * @return array {
-	 *     @type array $to_activate    List of plugin slugs to activate.
-	 *     @type array $missing        List of missing plugin slugs.
-	 *     @type array $version_issues List of plugins with version mismatches.
-	 * }
-	 */
-	private function evaluate_plugins(): array {
-		$plan = [
-			'to_activate'    => [],
-			'missing'        => [],
-			'version_issues' => [],
-		];
-
-		if ( empty( $this->config['plugins'] ) || ! is_array( $this->config['plugins'] ) ) {
-			return $plan;
-		}
-
-		foreach ( $this->config['plugins'] as $plugin ) {
-			$slug     = is_array( $plugin ) ? ( $plugin['file'] ?? '' ) : $plugin;
-			$required = is_array( $plugin ) ? ( $plugin['required'] ?? false ) : false;
-			$version  = is_array( $plugin ) ? ( $plugin['version'] ?? null ) : null;
-
-			if ( empty( $slug ) ) {
-				continue;
-			}
-
-			// File existence check
-			if ( ! ActivationUtils::plugin_file_exists( $slug ) ) {
-				$plan['missing'][] = $slug;
-				error_log(
-					sprintf( '[PluginActivator] Missing plugin file: %s', $slug )
-				);
-				continue;
-			}
-
-			// Version check if required
-			if ( $version ) {
-				$current_version = ActivationUtils::get_plugin_version( $slug );
-				if ( $current_version && ! ActivationUtils::satisfies_version( $current_version, $version ) ) {
-					$plan['version_issues'][] = [
-						'slug'     => $slug,
-						'required' => $version,
-						'current'  => $current_version,
-					];
-
-					error_log(
-						sprintf(
-							'[PluginActivator] Version mismatch for %s — required: %s, current: %s',
-							$slug,
-							$version,
-							$current_version
-						)
-					);
-
-					// Optional: skip activation on mismatch
-					continue;
-				}
-			}
-
-			// Activation state check
-			if ( ! is_plugin_active( $slug ) ) {
-				$plan['to_activate'][] = $slug;
-			}
-		}
-
-		return $plan;
-	}
-
-
 }

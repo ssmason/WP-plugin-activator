@@ -54,6 +54,7 @@ class ActivationController {
 			new PluginActivator( $this->config ),
 			new FilterActivator( $this->config ),
 			new SettingsActivator( $this->config ),
+			
 		];
 	} 
  

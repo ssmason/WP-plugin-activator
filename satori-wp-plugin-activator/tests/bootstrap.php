@@ -38,3 +38,5 @@ tests_add_filter('muplugins_loaded', function() use ($theme_root) {
 
 // Finally, boot the WP test suite
 require_once $tests_dir . '/includes/bootstrap.php';
+
+require_once __DIR__ . '/phpunit/helpers.php';

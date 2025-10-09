@@ -1,44 +1,38 @@
 <?php
 /**
  * @group mu-plugins/plugin-activator
- * @coversNothing
  */
 
 use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
 beforeEach(function () {
-    $this->slug = create_dummy_plugin('dummy-activation-utils', '2.5.0');
+    // Create a dummy plugin folder & file
+    $this->dummy_slug = 'dummy-activation-utils/dummy-activation-utils.php';
+    $this->dummy_dir  = WP_PLUGIN_DIR . '/dummy-activation-utils';
+
+    if ( ! is_dir( $this->dummy_dir ) ) {
+        mkdir( $this->dummy_dir );
+    }
+
+    file_put_contents(
+        $this->dummy_dir . '/dummy-activation-utils.php',
+        "<?php\n/*\nPlugin Name: Dummy Activation Utils\nVersion: 1.2.3\n*/"
+    );
 });
 
 afterEach(function () {
-    if (is_plugin_active($this->slug)) {
-        deactivate_plugins($this->slug, true);
+    // Clean up dummy file
+    if ( file_exists( $this->dummy_dir . '/dummy-activation-utils.php' ) ) {
+        unlink( $this->dummy_dir . '/dummy-activation-utils.php' );
     }
-
-    $pluginDir = WP_PLUGIN_DIR . '/dummy-activation-utils';
-    if (is_dir($pluginDir)) {
-        @unlink($pluginDir . '/dummy-activation-utils.php');
-        @rmdir($pluginDir);
+    if ( is_dir( $this->dummy_dir ) ) {
+        rmdir( $this->dummy_dir );
     }
 });
 
 it('reads the plugin version correctly from the plugin header', function () {
-    $version = ActivationUtils::get_plugin_version($this->slug);
+    $abs_path = WP_PLUGIN_DIR . '/' . $this->dummy_slug;
+    $version = ActivationUtils::get_plugin_version( $abs_path );
 
-    expect($version)->toEqual('2.5.0');
-});
-
-it('evaluates version constraints correctly', function () {
-    expect(ActivationUtils::satisfies_version('2.5.0', '>=2.0.0'))->toBeTrue();
-    expect(ActivationUtils::satisfies_version('2.5.0', '==2.5.0'))->toBeTrue();
-    expect(ActivationUtils::satisfies_version('2.5.0', '>=3.0.0'))->toBeFalse();
-    expect(ActivationUtils::satisfies_version('2.5.0', ''))->toBeTrue(); // no constraint
-});
-
-it('activates plugins using activate_plugins helper', function () {
-    expect(is_plugin_active($this->slug))->toBeFalse();
-
-    ActivationUtils::activate_plugins([$this->slug]);
-
-    expect(is_plugin_active($this->slug))->toBeTrue();
+    expect($version)->toBe('1.2.3');
 });

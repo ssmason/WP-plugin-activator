@@ -5,6 +5,7 @@
  */
 
 use SatoriDigital\PluginActivator\Activators\PluginActivator;
+use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
 beforeEach(function () {
     $this->slug = create_dummy_plugin('dummy-plugin-activator', '1.1.0');
@@ -24,10 +25,8 @@ afterEach(function () {
 it('evaluates required plugins correctly', function () {
     $activator = new PluginActivator($this->config);
 
-    $ref = new ReflectionClass($activator);
-    $method = $ref->getMethod('evaluate_plugins');
-    $method->setAccessible(true);
-    $report = $method->invoke($activator);
+    // New direct call to the helper
+    $report = ActivationUtils::evaluate_plugins($this->config);
 
     expect($report)
         ->toBeArray()

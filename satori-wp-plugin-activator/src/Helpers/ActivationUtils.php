@@ -27,6 +27,126 @@ class ActivationUtils {
 	}
 
 	/**
+	 * Evaluate plugin configuration to determine which plugins need activation.
+	 *
+	 * Checks for plugin file existence, activation state, and version requirements.
+	 * Logs any missing files or version mismatches, and builds a plan of plugins
+	 * that should be activated.
+	 *
+	 * @return array {
+	 *     @type array $to_activate    List of plugin slugs to activate.
+	 *     @type array $missing        List of missing plugin slugs.
+	 *     @type array $version_issues List of plugins with version mismatches.
+	 * }
+	*/
+	public static function evaluate_plugins( array $config ): array {
+		$plan = [
+			'to_activate'    => [],
+			'missing'        => [],
+			'version_issues' => [],
+		];
+
+		if ( empty( $config['plugins'] ) || ! is_array( $config['plugins'] ) ) {
+			return $plan;
+		}
+
+		foreach ( $config['plugins'] as $plugin ) {
+			$slug    = is_array( $plugin ) ? ( $plugin['file'] ?? '' ) : $plugin;
+			$version = is_array( $plugin ) ? ( $plugin['version'] ?? null ) : null;
+
+			if ( empty( $slug ) ) {
+				continue;
+			}
+
+			$check = self::evaluate_plugin_entry( $slug, $version );
+
+			if ( $check['missing'] ) {
+				$plan['missing'][] = $check['missing'];
+				continue;
+			}
+
+			if ( $check['version_issue'] ) {
+				$plan['version_issues'][] = $check['version_issue'];
+
+				if ( is_plugin_active( $check['version_issue']['slug'] ) ) {
+					deactivate_plugins( $check['version_issue']['slug'], true );
+				}
+
+				continue;
+			}
+
+			if ( $check['should_activate'] ) {
+				$plan['to_activate'][] = $slug;
+			}
+		}
+
+		return $plan;
+	}
+ 
+ 
+	public static function evaluate_plugin_entry( string $slug, ?string $required_version = null ): array {
+		$result = [
+			'missing'         => null,
+			'version_issue'   => null,
+			'should_activate' => false,
+		];
+
+		$abs = WP_PLUGIN_DIR . '/' . ltrim( $slug, '/' );
+
+		// File existence
+		if ( ( method_exists(__CLASS__, 'plugin_file_exists') && ! self::plugin_file_exists( $slug ) )
+			|| ! file_exists( $abs ) ) {
+
+			$result['missing'] = $slug;
+			error_log( sprintf( '[PluginActivator] Missing plugin file: %s', $slug ) );
+			return $result;
+		}
+
+		// Version check (if required)
+		if ( ! empty( $required_version ) ) {
+			$current_version = null;
+
+			// Prefer your existing helper if present
+			if ( method_exists( __CLASS__, 'get_plugin_version' ) ) {
+				$current_version = self::get_plugin_version( $abs );
+			} else {
+				// Fallback: read header directly
+				if ( function_exists( 'get_file_data' ) ) {
+					$headers = get_file_data( $abs, [ 'Version' => 'Version' ] );
+					$current_version = ! empty( $headers['Version'] ) ? $headers['Version'] : null;
+				}
+			}
+
+			$current_version = $current_version ?? '';
+
+			if ( $current_version === '' || ! self::satisfies_version( $current_version, $required_version ) ) {
+				$result['version_issue'] = [
+					'slug'     => $slug,
+					'required' => $required_version,
+					'current'  => $current_version !== '' ? $current_version : '(unknown)',
+				];
+
+				error_log( sprintf(
+					'[PluginActivator] Version mismatch for %s — required: %s, current: %s',
+					$slug,
+					$required_version,
+					$current_version !== '' ? $current_version : '(unknown)'
+				) );
+
+				return $result;
+			}
+		}
+
+		// Only mark for activation if not already active
+		if ( function_exists( 'is_plugin_active' ) && ! is_plugin_active( $slug ) ) {
+			$result['should_activate'] = true;
+		}
+
+		return $result;
+	}
+
+
+	/**
 	 * Activate an array of plugins by slug/path using core WordPress functions.
 	 *
 	 * @param array $plugins Array of plugin slugs or paths.
@@ -108,7 +228,7 @@ class ActivationUtils {
 	public static function get_plugin_version( string $slug ): ?string {
 		self::ensure_plugin_functions();
 
-		$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $slug, false, false );
+		$plugin_data = get_plugin_data( $slug, false, false );
 
 		return $plugin_data['Version'] ?? null;
 	}
@@ -122,12 +242,22 @@ class ActivationUtils {
 	 * @return bool
 	 */
 	public static function satisfies_version( string $current, ?string $required ): bool {
-		if ( empty( $required ) ) {
-			return true;
-		}
-
-		return version_compare( $current, $required, '>=' );
+	if ( empty( $required ) ) {
+		return true;
 	}
+
+	// Match operator and version number, e.g. ">=3.0.0" or "==2.5.0"
+	if ( preg_match( '/^(>=|<=|==|>|<)\s*(.+)$/', $required, $matches ) ) {
+		$operator = $matches[1];
+		$version  = $matches[2];
+
+		return version_compare( $current, $version, $operator );
+	}
+
+	// Fallback: if no operator given, do a simple >= comparison
+	return version_compare( $current, $required, '>=' );
+}
+
 
 	/**
 	 * Deactivate any plugins that are currently active but not listed in the configuration.

@@ -52,34 +52,43 @@ class FilterActivator implements ActivatorInterface {
 			$plugins  = $entry['plugins'] ?? [];
 			$priority = isset( $entry['priority'] ) ? (int) $entry['priority'] : 10;
 
-			if (! empty( $plugins) ) {
-				if ( empty( $hook ) || empty( $plugins ) || ! is_array( $plugins ) ) {
-					error_log(
-						sprintf(
-							'[PluginActivator] Invalid filtered activation entry: %s',
-							wp_json_encode( $entry )
-						)
-					);
-					continue;
-				}
-				add_action(
-					$hook,
-					function() use ( $plugins, $hook ) {
-						ActivationUtils::activate_plugins( $plugins );
+			if ( empty( $hook ) || empty( $plugins ) || ! is_array( $plugins ) ) {
+				error_log(
+					sprintf(
+						'[PluginActivator] Invalid filtered activation entry: %s',
+						wp_json_encode( $entry )
+					)
+				);
+				continue;
+			}
+
+			add_action(
+				$hook,
+				function() use ( $plugins, $hook ) {
+
+					// Build a temporary config matching the evaluate_plugins format
+					$temp_config = [ 'plugins' => [] ];
+					foreach ( $plugins as $plugin ) {
+						$temp_config['plugins'][] = is_array( $plugin ) ? $plugin : [ 'file' => $plugin ];
+					}
+
+					$plan = ActivationUtils::evaluate_plugins( $temp_config );
+
+					if ( ! empty( $plan['to_activate'] ) ) {
+						ActivationUtils::activate_plugins( $plan['to_activate'] );
 
 						error_log(
 							sprintf(
 								'[PluginActivator] Filtered activation triggered on hook "%s" for plugins: %s',
 								$hook,
-								implode( ', ', $plugins )
+								implode( ', ', $plan['to_activate'] )
 							)
 						);
-					},
-					$priority
-				);
-			}
-
-			
+					}
+				},
+				$priority
+			);
 		}
 	}
+
 }
