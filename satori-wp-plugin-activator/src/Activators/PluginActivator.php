@@ -1,76 +1,72 @@
 <?php
-/**
- * Satori Digital Plugin Activator
- *
- * @category Plugin_Loader
- * @package  SatoriDigital\Activate
- */
-
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace SatoriDigital\PluginActivator\Activators;
 
 use SatoriDigital\PluginActivator\Interfaces\ActivatorInterface;
 use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
+final class PluginActivator implements ActivatorInterface
+{
+    private array $plugins;
 
-/**
- * Activate Class
- *
- * Class to load plugins either at network or site level
- */
-class PluginActivator implements ActivatorInterface {
- 
-	/**
-	 * Plugin activation configuration.
-	 *
-	 * @var array
-	 */
-	private array $config;
- 
-	/**
-	 * Plugin constructor.
-	 */
-	public function __construct( array $config ) {
-		$this->config = $config;
-	}
-	
-	/**
-	 * Evaluate and activate all plugins defined in the configuration.
-	 *
-	 * This method checks the filesystem, activation state, and version requirements
-	 * for each plugin. It builds an activation plan, logs any missing plugins or
-	 * version mismatches, and activates any plugins that are not currently active.
-	 * It also deactivates any plugins that are currently active but not listed in
-	 * the configuration.
-	 *
-	 * @return void
-	 */
-	public function activate(): void {
-		$plan = ActivationUtils::evaluate_plugins( $this->config);
+    public function __construct(array $config)
+    {
+        $this->plugins = $config['plugins'] ?? [];
+    }
 
-		if ( ! empty( $plan['to_activate'] ) ) {
-			$immediate = [];
-			$deferred  = [];
+    public function getType(): string
+    {
+        return 'plugin';
+    }
 
-			foreach ( $plan['to_activate'] as $plugin ) {
-				if ( ! empty( $plugin['defer'] ) && $plugin['defer'] === true ) {
-					$deferred[] = $plugin;
-				} else {
-					$immediate[] = $plugin;
-				}
-			}
-			// Activate immediate plugins right away
-			if ( ! empty( $immediate ) ) {
-				ActivationUtils::activate_plugins( $immediate );
-			}
+    public function collect(): array
+    {
+        $items = [];
+        foreach ($this->plugins as $p) {
+            if (empty($p['file'])) {
+                error_log('[PluginActivator] Skipping plugin with missing "file".');
+                continue;
+            }
+            $items[] = [
+                'type'  => $this->getType(),
+                'order' => (int)($p['order'] ?? 0),
+                'data'  => $p,
+            ];
+        }
+        return $items;
+    }
 
-			// Defer activation of others to plugins_loaded
-			if ( ! empty( $deferred ) ) {
-				add_action( 'plugins_loaded', function() use ( $deferred ) {
-					ActivationUtils::activate_plugins( $deferred );
-				}, 1 );
-			}
-		}
-	}
+    public function handle(array $item): void
+    {
+        $p    = $item['data'];
+        $file = $p['file'];
+        $req  = $p['required'] ?? false;
+        $ver  = $p['version']  ?? null;
+
+        // file exist check
+        if (!ActivationUtils::plugin_file_exists($file)) {
+            error_log(sprintf('[PluginActivator] Plugin file not found: %s', $file));
+            if (!empty($req)) {
+                // required plugin missing — log hard failure (do not wp_die() to avoid white-screens)
+                error_log(sprintf('[PluginActivator] REQUIRED plugin missing: %s', $file));
+            }
+            return;
+        }
+
+        // version check (if provided)
+        if (!empty($ver)) {
+            $current = ActivationUtils::get_plugin_version($file);
+            if ($current !== null && !ActivationUtils::satisfies_version($current, $ver)) {
+                error_log(sprintf('[PluginActivator] Version mismatch for %s. Required %s, found %s.', $file, $ver, $current));
+                if (!empty($req)) {
+                    // required but version mismatch — still attempt activation, but log loudly
+                    error_log(sprintf('[PluginActivator] REQUIRED plugin %s does not meet version %s. Proceeding to activate anyway.', $file, $ver));
+                }
+            }
+        }
+
+        // activate (uses WP core via ActivationUtils)
+        ActivationUtils::activate_plugins([$p]);
+    }
 }

@@ -1,295 +1,291 @@
 <?php
-/**
- * Activation Utilities
- *
- * Shared helper functions used by multiple activators.
- *
- * @category Plugin_Activator
- * @package  SatoriDigital\PluginActivator\Helpers
- */
-
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace SatoriDigital\PluginActivator\Helpers;
 
-class ActivationUtils {
+use function activate_plugin;
+use function deactivate_plugins;
+use function get_option;
+use function get_plugins;
+use function is_multisite;
+use function is_plugin_active;
 
-	/**
-	 * Ensure WordPress plugin functions are loaded.
-	 * Some functions like activate_plugin() are only available in wp-admin context.
-	 *
-	 * @return void
-	 */
-	public static function ensure_plugin_functions(): void {
-		if ( ! function_exists( 'activate_plugin' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		}
-	}
+final class ActivationUtils
+{
+    /**
+     * Ensure WP plugin API is loaded (needed for activate_plugin(), get_plugins(), etc.).
+     */
+    private static function ensureWpPluginApi(): void
+    {
+        if (!\function_exists('activate_plugin')) {
+            require_once \ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+    }
 
-	/**
-	 * Evaluate plugin configuration to determine which plugins need activation.
-	 *
-	 * Checks for plugin file existence, activation state, and version requirements.
-	 * Logs any missing files or version mismatches, and builds a plan of plugins
-	 * that should be activated.
-	 *
-	 * @return array {
-	 *     @type array $to_activate    List of plugin slugs to activate.
-	 *     @type array $missing        List of missing plugin slugs.
-	 *     @type array $version_issues List of plugins with version mismatches.
-	 * }
-	*/
-	public static function evaluate_plugins( array $config ): array {
-		$plan = [
-			'to_activate'    => [],
-			'missing'        => [],
-			'version_issues' => [],
-		];
+    /**
+     * Normalize any input (strings, specs, collected items) into a flat list of plugin specs.
+     */
+    private static function normalizeToSpecs(array $input): array
+    {
+        $specs = [];
 
-		if ( empty( $config['plugins'] ) || ! is_array( $config['plugins'] ) ) {
-			return $plan;
-		}
+        $appendSpec = static function (array $maybe) use (&$specs): void {
+            if (empty($maybe['file'])) {
+                return;
+            }
+            $specs[] = [
+                'file'     => $maybe['file'],
+                'required' => $maybe['required'] ?? false,
+                'version'  => $maybe['version'] ?? null,
+                'defer'    => $maybe['defer'] ?? false,
+            ];
+        };
 
-		foreach ( $config['plugins'] as $plugin ) {
-			$slug    = is_array( $plugin ) ? ( $plugin['file'] ?? '' ) : $plugin;
-			$version = is_array( $plugin ) ? ( $plugin['version'] ?? null ) : null;
+        foreach ($input as $item) {
+            if (\is_string($item)) {
+                $appendSpec(['file' => $item]);
+                continue;
+            }
 
-			if ( empty( $slug ) ) {
-				continue;
-			}
+            if (!\is_array($item)) {
+                continue;
+            }
 
-			$check = self::evaluate_plugin_entry( $slug, $version );
+            if (!empty($item['file'])) {
+                $appendSpec($item);
+                continue;
+            }
 
-			if ( $check['missing'] ) {
-				$plan['missing'][] = $check['missing'];
-				continue;
-			}
+            if (!empty($item['data']) && \is_array($item['data'])) {
+                $d = $item['data'];
 
-			if ( $check['version_issue'] ) {
-				$plan['version_issues'][] = $check['version_issue'];
+                if (!empty($d['file'])) {
+                    $appendSpec($d);
+                    continue;
+                }
 
-				if ( is_plugin_active( $check['version_issue']['slug'] ) ) {
-					deactivate_plugins( $check['version_issue']['slug'], true );
-				}
+                if (!empty($d['plugins']) && \is_array($d['plugins'])) {
+                    foreach ($d['plugins'] as $p) {
+                        if (\is_string($p)) {
+                            $appendSpec(['file' => $p]);
+                        } elseif (\is_array($p)) {
+                            $appendSpec($p);
+                        }
+                    }
+                }
+            }
 
-				continue;
-			}
+            if (!empty($item['plugins']) && \is_array($item['plugins'])) {
+                foreach ($item['plugins'] as $p) {
+                    if (\is_string($p)) {
+                        $appendSpec(['file' => $p]);
+                    } elseif (\is_array($p)) {
+                        $appendSpec($p);
+                    }
+                }
+            }
+        }
 
-			if ( $check['should_activate'] ) {
-				$plan['to_activate'][] = $slug;
-			}
-		}
+        $dedup = [];
+        foreach ($specs as $s) {
+            $dedup[$s['file']] = $s;
+        }
 
-		return $plan;
-	}
- 
- 
-	public static function evaluate_plugin_entry( string $slug, ?string $required_version = null ): array {
-		$result = [
-			'missing'         => null,
-			'version_issue'   => null,
-			'should_activate' => false,
-		];
+        return \array_values($dedup);
+    }
 
-		$abs = WP_PLUGIN_DIR . '/' . ltrim( $slug, '/' );
+    /**
+     * Extract just the plugin file paths from any mixed input.
+     */
+    private static function extractFiles(array $input): array
+    {
+        $files = [];
+        $specs = self::normalizeToSpecs($input);
 
-		// File existence
-		if ( ( method_exists(__CLASS__, 'plugin_file_exists') && ! self::plugin_file_exists( $slug ) )
-			|| ! file_exists( $abs ) ) {
+        foreach ($specs as $s) {
+            $files[] = $s['file'];
+        }
 
-			$result['missing'] = $slug;
-			error_log( sprintf( '[PluginActivator] Missing plugin file: %s', $slug ) );
-			return $result;
-		}
+        return \array_values(\array_unique(\array_filter($files)));
+    }
 
-		// Version check (if required)
-		if ( ! empty( $required_version ) ) {
-			$current_version = null;
+    /**
+     * True if the plugin file exists under WP_PLUGIN_DIR.
+     */
+    public static function plugin_file_exists(string $file): bool
+    {
+        return \file_exists(\WP_PLUGIN_DIR . '/' . $file);
+    }
 
-			// Prefer your existing helper if present
-			if ( method_exists( __CLASS__, 'get_plugin_version' ) ) {
-				$current_version = self::get_plugin_version( $abs );
-			} else {
-				// Fallback: read header directly
-				if ( function_exists( 'get_file_data' ) ) {
-					$headers = get_file_data( $abs, [ 'Version' => 'Version' ] );
-					$current_version = ! empty( $headers['Version'] ) ? $headers['Version'] : null;
-				}
-			}
+    /**
+     * Return installed version for a plugin file, or null if not found.
+     */
+    public static function get_plugin_version(string $file): ?string
+    {
+        self::ensureWpPluginApi();
+        $all = get_plugins();
+        if (!isset($all[$file]['Version'])) {
+            return null;
+        }
+        $ver = (string) $all[$file]['Version'];
+        return $ver !== '' ? $ver : null;
+    }
 
-			$current_version = $current_version ?? '';
+    /**
+     * Compare version using an expression like '>=2.1.0', '<1.0', '=3.0', etc.
+     */
+    public static function satisfies_version(string $current, ?string $requiredExpr): bool
+    {
+        if ($requiredExpr === null || $requiredExpr === '') {
+            return true;
+        }
+        if (!\preg_match('/^(>=|<=|>|<|=|==|!=)?\s*([0-9][0-9\.]*)$/', $requiredExpr, $m)) {
+            return \version_compare($current, $requiredExpr, '>=');
+        }
+        $op  = $m[1] ?: '>=';
+        $ver = $m[2];
+        return \version_compare($current, $ver, $op);
+    }
 
-			if ( $current_version === '' || ! self::satisfies_version( $current_version, $required_version ) ) {
-				$result['version_issue'] = [
-					'slug'     => $slug,
-					'required' => $required_version,
-					'current'  => $current_version !== '' ? $current_version : '(unknown)',
-				];
+    /**
+     * Check versions without activation.
+     */
+    public static function check_versions(array $input): void
+    {
+        $specs = self::normalizeToSpecs($input);
+        foreach ($specs as $s) {
+            $file = $s['file'];
+            $req  = $s['version'] ?? null;
+            if (!$req) {
+                continue;
+            }
+            $current = self::get_plugin_version($file);
+            if ($current !== null && !self::satisfies_version($current, $req)) {
+                \error_log(\sprintf('[PluginActivator] Version mismatch: %s requires %s, found %s.', $file, $req, $current));
+            }
+        }
+    }
 
-				error_log( sprintf(
-					'[PluginActivator] Version mismatch for %s — required: %s, current: %s',
-					$slug,
-					$required_version,
-					$current_version !== '' ? $current_version : '(unknown)'
-				) );
+    /**
+     * Strict activation with version enforcement.
+     */
+    public static function activate_plugins(array $input): void
+    {
+        self::ensureWpPluginApi();
 
-				return $result;
-			}
-		}
+        $specs    = self::normalizeToSpecs($input);
+        $deferred = [];
 
-		// Only mark for activation if not already active
-		if ( function_exists( 'is_plugin_active' ) && ! is_plugin_active( $slug ) ) {
-			$result['should_activate'] = true;
-		}
+        foreach ($specs as $s) {
+            $file     = $s['file'];
+            $required = (bool)($s['required'] ?? false);
+            $expr     = $s['version']  ?? null;
+            $defer    = (bool)($s['defer']    ?? false);
 
-		return $result;
-	}
+            if (!self::plugin_file_exists($file)) {
+                \error_log(\sprintf('[PluginActivator] Plugin file not found: %s', $file));
+                if ($required) {
+                    self::log_missing_plugin($file);
+                }
+                continue;
+            }
 
+            if ($expr) {
+                $current = self::get_plugin_version($file);
+                \error_log(\sprintf('[PluginActivator][DEBUG] Checking version during activation for %s: current=%s, required=%s',
+                    $file, $current ?? 'null', $expr));
 
-	/**
-	 * Activate an array of plugins by slug/path using core WordPress functions.
-	 *
-	 * @param array $plugins Array of plugin slugs or paths.
-	 * @return void
-	 */
-	public static function activate_plugins( array $plugins ): void {
-		self::ensure_plugin_functions(); 	
-		foreach ( $plugins as $plugin ) {
+                if ($current === null || !self::satisfies_version($current, $expr)) {
+                    \error_log(\sprintf('[PluginActivator][DEBUG] Version check failed for %s. Required %s, found %s.',
+                        $file, $expr, $current ?? 'unknown'));
 
-			$slug = is_array( $plugin ) ? ( $plugin['file'] ?? '' ) : $plugin;
-			
-			if ( empty( $slug ) ) {
-				error_log( '[ActivationUtils] Empty plugin slug detected during activation.' );
-				continue;
-			}
+                    // If active, deactivate it
+                    if (is_plugin_active($file)) {
+                        deactivate_plugins([$file], false, is_multisite());
+                        \error_log(\sprintf('[PluginActivator] Deactivated due to version mismatch: %s', $file));
+                    }
+                    continue; // Skip activation entirely
+                }
+            }
 
-			if ( ! self::plugin_file_exists( $slug ) ) {
-				error_log(
-					sprintf( '[ActivationUtils] Plugin file not found: %s', $slug )
-				);
-				continue;
-			}
+            if ($defer) {
+                $deferred[] = $file;
+                continue;
+            }
 
-			$active_plugins = get_option( 'active_plugins', [] );
-			if ( in_array( $slug, $active_plugins, true ) ) {
-				continue; // already active
-			}
+            if (!is_plugin_active($file)) {
+                activate_plugin($file, '', false, true);
+                \error_log(\sprintf('[PluginActivator] Plugin activated: %s', $file));
+            }
+        }
 
-			$result = activate_plugin( $slug );
+        foreach ($deferred as $file) {
+            if (!is_plugin_active($file)) {
+                activate_plugin($file, '', false, true);
+                \error_log(\sprintf('[PluginActivator] Plugin activated (deferred): %s', $file));
+            }
+        }
+    }
 
-			if ( is_wp_error( $result ) ) {
-				error_log(
-					sprintf(
-						'[PluginActivator] Failed to activate plugin %s: %s',
-						$slug,
-						$result->get_error_message()
-					)
-				);
-			} else {
-				error_log(
-					sprintf( '[PluginActivator] Plugin activated: %s', $slug )
-				);
-			}
-		}
-	}
+    /**
+     * Deactivate plugins NOT present in the provided input.
+     */
+    public static function deactivate_unlisted_plugins(array $input): void
+    {
+        self::ensureWpPluginApi();
 
-	/**
-	 * Deactivate an array of plugins.
-	 *
-	 * @param array $plugins List of plugin paths to deactivate.
-	 */
-	public static function deactivate_plugins( array $plugins ): void {
-		if ( empty( $plugins ) ) {
-			return;
-		}
+        $allowedFiles = self::extractFiles($input);
+        $active       = (array) get_option('active_plugins', []);
 
-		self::ensure_plugin_functions();
+        $toDeactivate = \array_values(\array_diff($active, $allowedFiles));
 
-		// ✅ Call the global WordPress function explicitly
-		\deactivate_plugins( $plugins, false, is_multisite() );
-	}
+        if (empty($toDeactivate)) {
+            return;
+        }
 
-	/**
-	 * Check if the plugin file exists in the WP plugins directory.
-	 *
-	 * @param string $slug Plugin path relative to WP_PLUGIN_DIR.
-	 * @return bool
-	 */
-	public static function plugin_file_exists( string $slug ): bool {
-		return file_exists( WP_PLUGIN_DIR . '/' . $slug );
-	}
+        deactivate_plugins($toDeactivate, false, is_multisite());
 
-	/**
-	 * Get the installed version of a plugin, if available.
-	 *
-	 * @param string $slug Plugin path relative to WP_PLUGIN_DIR.
-	 * @return string|null Version string or null if not found.
-	 */
-	public static function get_plugin_version( string $slug ): ?string {
-		self::ensure_plugin_functions();
+        \error_log(\sprintf(
+            '[PluginActivator] Deactivated unlisted plugins: %s',
+            \implode(', ', $toDeactivate)
+        ));
+    }
 
-		$plugin_data = get_plugin_data( $slug, false, false );
+    public static function check_version(string $file, string $constraint): bool
+    {
+        self::ensureWpPluginApi();
 
-		return $plugin_data['Version'] ?? null;
-	}
+        $plugins = get_plugins();
+        if (!isset($plugins[$file]['Version'])) {
+            return false;
+        }
 
-	/**
-	 * Check whether the installed version satisfies the required version.
-	 * Currently supports >= comparison.
-	 *
-	 * @param string      $current  Current installed version.
-	 * @param string|null $required Required minimum version.
-	 * @return bool
-	 */
-	public static function satisfies_version( string $current, ?string $required ): bool {
-	if ( empty( $required ) ) {
-		return true;
-	}
+        $installed = $plugins[$file]['Version'];
 
-	// Match operator and version number, e.g. ">=3.0.0" or "==2.5.0"
-	if ( preg_match( '/^(>=|<=|==|>|<)\s*(.+)$/', $required, $matches ) ) {
-		$operator = $matches[1];
-		$version  = $matches[2];
+        if (preg_match('/^(>=|<=|>|<|==|!=)\s*(.+)$/', $constraint, $matches)) {
+            return version_compare($installed, $matches[2], $matches[1]);
+        }
 
-		return version_compare( $current, $version, $operator );
-	}
+        return version_compare($installed, $constraint, '>=');
+    }
 
-	// Fallback: if no operator given, do a simple >= comparison
-	return version_compare( $current, $required, '>=' );
-}
+    public static function is_plugin_file_missing(string $plugin_file): bool
+    {
+        return ! self::plugin_file_exists($plugin_file);
+    }
 
+    public static function log_version_mismatch(string $plugin_file, string $requiredExpr, ?string $current = null): void
+    {
+        if ($current === null) {
+            $current = self::get_plugin_version($plugin_file) ?? 'unknown';
+        }
+        error_log(
+            sprintf('[PluginActivator] Version mismatch for %s. Required %s, found %s.', $plugin_file, $requiredExpr, $current)
+        );
+    }
 
-	/**
-	 * Deactivate any plugins that are currently active but not listed in the configuration.
-	 *
-	 * @param array $configured_plugins Array of normalized plugin entries (must include 'slug').
-	 * @return void
-	 */
-	public static function deactivate_unlisted_plugins( array $configured_plugins ): void {
-		self::ensure_plugin_functions();
-
-		$active_plugins = get_option( 'active_plugins', [] );
-		$config_slugs   = array_map(
-			static function ( $plugin ) {
-				return is_array( $plugin ) ? ( $plugin['file'] ?? '' ) : $plugin;
-			},
-			$configured_plugins
-		);
-
-		$config_slugs = array_filter( $config_slugs ); // remove empties
-		$to_deactivate = array_diff( $active_plugins, $config_slugs );
-
-		if ( empty( $to_deactivate ) ) {
-			return;
-		}
-
-		self::deactivate_plugins( $to_deactivate );
-
-		error_log(
-			sprintf(
-				'[PluginActivator] Deactivated unlisted plugins: %s',
-				implode( ', ', $to_deactivate )
-			)
-		);
-	}
+    public static function log_missing_plugin(string $plugin_file): void
+    {
+        error_log(sprintf('[PluginActivator] REQUIRED plugin missing: %s', $plugin_file));
+    }
 }

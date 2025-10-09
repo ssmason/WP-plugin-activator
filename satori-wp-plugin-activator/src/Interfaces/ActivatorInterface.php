@@ -16,9 +16,32 @@ namespace SatoriDigital\PluginActivator\Interfaces;
 interface ActivatorInterface {
 
 	/**
-	 * Execute the activation process for this activator.
-	 *
-	 * @return void
-	 */
-	public function activate(): void;
+     * Collect normalized items for global ordering.
+     *
+     * Shape per item:
+     * [
+     *   'type'  => 'plugin'|'filter'|'setting'|'group',
+     *   'order' => int,        // default 0 if not provided
+     *   'data'  => array       // original activator-specific payload
+     * ]
+     *
+     * @return array<int, array{type:string, order:int, data:array}>
+     */
+    public function collect(): array;
+
+    /**
+     * Process a single normalized item (called after global sort).
+     *
+     * @param array{type:string, order:int, data:array} $item
+     * @return void
+     */
+    public function handle(array $item): void;
+
+    /**
+     * The type key this activator is responsible for.
+     * Used by the controller to route items back to the correct activator.
+     *
+     * @return string One of: 'plugin'|'filter'|'setting'|'group'
+     */
+    public function getType(): string;
 }

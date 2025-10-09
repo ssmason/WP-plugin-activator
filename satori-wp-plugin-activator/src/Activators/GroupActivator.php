@@ -1,44 +1,70 @@
 <?php
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace SatoriDigital\PluginActivator\Activators;
 
-class GroupActivator {
+use SatoriDigital\PluginActivator\Interfaces\ActivatorInterface;
+use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
-	/**
-	 * Merge group plugins into config based on current site URL.
-	 *
-	 * @param array $config Original config.
-	 * @return array Merged config with matched group plugins.
-	 */
-	public static function merge_group_plugins( array $config ): array {
-		if ( empty( $config['groups'] ) || ! is_array( $config['groups'] ) ) {
-			return $config;
-		}
+final class GroupActivator implements ActivatorInterface
+{
+    private array $groups;
 
-		$current_url = home_url();
+    public function __construct(array $config)
+    {
+        // Expect: "groups": { "staging": { "url": "...", "plugins":[...] }, "production": {...} }
+        $this->groups = $config['groups'] ?? [];
+    }
 
-		foreach ( $config['groups'] as $group_name => $group ) {
-			$group_url     = $group['url'] ?? '';
-			$group_plugins = $group['plugins'] ?? [];
+    public function getType(): string
+    {
+        return 'group';
+    }
 
-			if ( ! empty( $group_url ) && $group_url === $current_url ) {
-				error_log( sprintf(
-					'[GroupActivator] Merging %d plugins from group "%s" for URL "%s"',
-					count( $group_plugins ),
-					$group_name,
-					$current_url
-				) );
+    public function collect(): array
+    {
+        $items = [];
+        if (empty($this->groups)) {
+            return $items;
+        }
 
-				$config['plugins'] = array_merge(
-					$config['plugins'] ?? [],
-					$group_plugins
-				);
+        $current = rtrim(site_url(), '/');
 
-				break; // Only match one group
-			}
-		}
+        foreach ($this->groups as $groupName => $g) {
+            $url = !empty($g['url']) ? rtrim($g['url'], '/') : null;
+            if (!$url || $url !== $current) {
+                continue; // only collect for the matching environment
+            }
 
-		return $config;
-	}
+            $plugins = $g['plugins'] ?? [];
+            foreach ($plugins as $p) {
+                if (empty($p['file'])) {
+                    error_log(sprintf('[GroupActivator] %s: skipping plugin with missing "file".', $groupName));
+                    continue;
+                }
+                $items[] = [
+                    'type'  => $this->getType(),
+                    'order' => (int)($p['order'] ?? 0),
+                    'data'  => $p,
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    public function handle(array $item): void
+    {
+        $p = $item['data'];
+
+        // Optional version check before activation
+        if (!empty($p['version'])) {
+            $current = ActivationUtils::get_plugin_version($p['file']);
+            if ($current !== null && !ActivationUtils::satisfies_version($current, $p['version'])) {
+                error_log(sprintf('[GroupActivator] Version mismatch for %s. Required %s, found %s.', $p['file'], $p['version'], $current));
+            }
+        }
+
+        ActivationUtils::activate_plugins([$p]);
+    }
 }
