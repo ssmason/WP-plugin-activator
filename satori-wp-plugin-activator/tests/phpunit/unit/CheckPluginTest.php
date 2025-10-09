@@ -1,19 +1,19 @@
 <?php
 /**
- * @group <mu-plugins/plugin-activator>
+ * @group mu-plugins/plugin-activator
+ * @coversNothing
  */
+use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
+
 class CheckPluginTest extends WP_UnitTestCase
 {
-    // public function setUp(): void
-    // {
-    //     parent::setUp();
-    //     $adminId = self::factory()->user->create(['role' => 'administrator']);
-    //     wp_set_current_user($adminId);
-    // }
-    
-    public function testWorking()
-    { 
-        $result = 'test';
-        $this->assertSame('test', $result);
+    public function test_dummy_plugin_activation_flow()
+    {
+        $slug = create_dummy_plugin('dummy-check-plugin', '1.0.0');
+        $this->assertFalse(is_plugin_active($slug), 'Plugin should start inactive');
+
+        // Activate via helper
+        ActivationUtils::activate_plugins([$slug]);
+        $this->assertTrue(is_plugin_active($slug), 'Plugin should now be active');
     }
 }
