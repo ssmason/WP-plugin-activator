@@ -3,44 +3,42 @@
  * @group mu-plugins/plugin-activator
  * @coversNothing
  */
+
 use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
-class ActivationUtilsTest extends WP_UnitTestCase {
-    public function setUp(): void {
-        parent::setUp();
-        // Create dummy plugin with a known version
-        $this->plugin_slug = create_dummy_plugin('dummy-activation-utils', '2.5.0');
+beforeEach(function () {
+    $this->slug = create_dummy_plugin('dummy-activation-utils', '2.5.0');
+});
+
+afterEach(function () {
+    if (is_plugin_active($this->slug)) {
+        deactivate_plugins($this->slug, true);
     }
 
-    public function tearDown(): void {
-        parent::tearDown();
-        // Best-effort cleanup: deactivate and remove
-        if ( is_plugin_active($this->plugin_slug) ) {
-            deactivate_plugins($this->plugin_slug, true);
-        }
-        $dir = WP_PLUGIN_DIR . '/dummy-activation-utils';
-        if ( file_exists($dir) ) {
-            // remove file and dir
-            @unlink($dir . '/dummy-activation-utils.php');
-            @rmdir($dir);
-        }
+    $pluginDir = WP_PLUGIN_DIR . '/dummy-activation-utils';
+    if (is_dir($pluginDir)) {
+        @unlink($pluginDir . '/dummy-activation-utils.php');
+        @rmdir($pluginDir);
     }
+});
 
-    public function test_plugin_version_reads_from_header(): void {
-        $ver = ActivationUtils::plugin_version($this->plugin_slug);
-        $this->assertSame('2.5.0', $ver);
-    }
+it('reads the plugin version correctly from the plugin header', function () {
+    $version = ActivationUtils::get_plugin_version($this->slug);
 
-    public function test_satisfies_version_constraints(): void {
-        $this->assertTrue(ActivationUtils::satisfies_version('2.5.0', '>=2.0.0'));
-        $this->assertTrue(ActivationUtils::satisfies_version('2.5.0', '==2.5.0'));
-        $this->assertFalse(ActivationUtils::satisfies_version('2.5.0', '>=3.0.0'));
-        $this->assertTrue(ActivationUtils::satisfies_version('2.5.0', '')); // empty => no constraint
-    }
+    expect($version)->toEqual('2.5.0');
+});
 
-    public function test_activate_plugins_activates_list(): void {
-        $this->assertFalse(is_plugin_active($this->plugin_slug));
-        ActivationUtils::activate_plugins([ $this->plugin_slug ]);
-        $this->assertTrue(is_plugin_active($this->plugin_slug));
-    }
-}
+it('evaluates version constraints correctly', function () {
+    expect(ActivationUtils::satisfies_version('2.5.0', '>=2.0.0'))->toBeTrue();
+    expect(ActivationUtils::satisfies_version('2.5.0', '==2.5.0'))->toBeTrue();
+    expect(ActivationUtils::satisfies_version('2.5.0', '>=3.0.0'))->toBeFalse();
+    expect(ActivationUtils::satisfies_version('2.5.0', ''))->toBeTrue(); // no constraint
+});
+
+it('activates plugins using activate_plugins helper', function () {
+    expect(is_plugin_active($this->slug))->toBeFalse();
+
+    ActivationUtils::activate_plugins([$this->slug]);
+
+    expect(is_plugin_active($this->slug))->toBeTrue();
+});

@@ -3,32 +3,50 @@
  * @group mu-plugins/plugin-activator
  * @coversNothing
  */
+
 use SatoriDigital\PluginActivator\Activators\FilterActivator;
 
-class FilterActivatorTest extends WP_UnitTestCase
-{
-    public function test_activation_is_triggered_on_custom_hook()
-    {
-        $slug = create_dummy_plugin('dummy-filter-activator', '1.0.0');
+beforeEach(function () {
+    $this->slug = create_dummy_plugin('dummy-filter-activator', '1.0.0');
+    $this->hook = 'test_filter_activation_hook';
 
-        $config = [
-            'filtered' => [
-                [
-                    'hook'     => 'my_test_activation_hook',
-                    'priority' => 1,
-                    'plugins'  => [ $slug ],
-                ]
-            ]
-        ];
+    $this->config = [
+        'filtered' => [
+            [
+                'hook'     => $this->hook,
+                'priority' => 1,
+                'plugins'  => [ $this->slug ],
+            ],
+        ],
+    ];
+});
 
-        $activator = new FilterActivator($config);
-        $activator->activate();
-
-        $this->assertFalse(is_plugin_active($slug), 'Should not be active before hook fires');
-
-        // Trigger the hook
-        do_action('my_test_activation_hook');
-
-        $this->assertTrue(is_plugin_active($slug), 'Should be active after hook');
+afterEach(function () {
+    if (is_plugin_active($this->slug)) {
+        deactivate_plugins($this->slug, true);
     }
-}
+    // Clean up hooks to avoid bleeding between tests
+    remove_all_actions($this->hook);
+});
+
+it('registers a hook-based activation callback', function () {
+    $activator = new FilterActivator($this->config);
+    $activator->activate();
+
+    // WordPress stores callbacks in global $wp_filter
+    global $wp_filter;
+
+    expect($wp_filter)->toHaveKey($this->hook);
+    expect($wp_filter[$this->hook]->callbacks)->not->toBeEmpty();
+});
+
+it('activates plugins when the configured hook is triggered', function () {
+    $activator = new FilterActivator($this->config);
+    $activator->activate();
+
+    expect(is_plugin_active($this->slug))->toBeFalse();
+
+    do_action($this->hook);
+
+    expect(is_plugin_active($this->slug))->toBeTrue();
+});
