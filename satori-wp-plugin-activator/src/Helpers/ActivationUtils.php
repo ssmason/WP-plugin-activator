@@ -192,13 +192,10 @@ final class ActivationUtils
 
             if ($expr) {
                 $current = self::get_plugin_version($file);
-                \error_log(\sprintf('[PluginActivator][DEBUG] Checking version during activation for %s: current=%s, required=%s',
                     $file, $current ?? 'null', $expr));
 
                 if ($current === null || !self::satisfies_version($current, $expr)) {
-                    \error_log(\sprintf('[PluginActivator][DEBUG] Version check failed for %s. Required %s, found %s.',
                         $file, $expr, $current ?? 'unknown'));
-
                     // If active, deactivate it
                     if (is_plugin_active($file)) {
                         deactivate_plugins([$file], false, is_multisite());
