@@ -191,11 +191,8 @@ final class ActivationUtils
             }
 
             if ($expr) {
-                $current = self::get_plugin_version($file);
-                    $file, $current ?? 'null', $expr));
-
-                if ($current === null || !self::satisfies_version($current, $expr)) {
-                        $file, $expr, $current ?? 'unknown'));
+                $current = self::get_plugin_version($file); 
+                if ($current === null || !self::satisfies_version($current, $expr)) { 
                     // If active, deactivate it
                     if (is_plugin_active($file)) {
                         deactivate_plugins([$file], false, is_multisite());
