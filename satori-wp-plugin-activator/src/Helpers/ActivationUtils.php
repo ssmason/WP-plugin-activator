@@ -209,14 +209,12 @@ final class ActivationUtils
 
             if (!is_plugin_active($file)) {
                 activate_plugin($file, '', false, true);
-                \error_log(\sprintf('[PluginActivator] Plugin activated: %s', $file));
             }
         }
 
         foreach ($deferred as $file) {
             if (!is_plugin_active($file)) {
                 activate_plugin($file, '', false, true);
-                \error_log(\sprintf('[PluginActivator] Plugin activated (deferred): %s', $file));
             }
         }
     }
