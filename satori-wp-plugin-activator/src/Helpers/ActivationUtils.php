@@ -38,6 +38,14 @@ use function is_plugin_active;
 final class ActivationUtils
 {
     /**
+     * Cached plugin data to avoid multiple get_plugins() calls.
+     *
+     * @var array|null
+     * @since 1.0.0
+     */
+    private static ?array $plugin_cache = null;
+
+    /**
      * Ensure WordPress plugin API is loaded.
      *
      * Loads the WordPress plugin administration functions if they are not
@@ -51,6 +59,34 @@ final class ActivationUtils
         if (!\function_exists('activate_plugin')) {
             require_once \ABSPATH . 'wp-admin/includes/plugin.php';
         }
+    }
+
+    /**
+     * Get cached plugin data, loading once if needed.
+     *
+     * @return array Plugin data from WordPress.
+     * @since 1.0.0
+     */
+    private static function get_all_plugins(): array
+    {
+        if (self::$plugin_cache === null) {
+            self::ensure_wp_plugin_api();
+            self::$plugin_cache = get_plugins();
+        }
+        return self::$plugin_cache;
+    }
+
+    /**
+     * Clear the plugin cache.
+     *
+     * Useful for testing or when plugins change during execution.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public static function clear_plugin_cache(): void
+    {
+        self::$plugin_cache = null;
     }
 
     /**
@@ -207,8 +243,7 @@ final class ActivationUtils
      */
     public static function get_plugin_version(string $file): ?string
     {
-        self::ensure_wp_plugin_api();
-        $all = get_plugins();
+        $all = self::get_all_plugins(); // ← Uses cache instead of direct get_plugins()
         if (!isset($all[$file]['Version'])) {
             return null;
         }
@@ -257,6 +292,10 @@ final class ActivationUtils
     public static function check_versions(array $input): void
     {
         $specs = self::normalize_to_specs($input);
+        
+        // Get all plugin data once for the entire batch.
+        $all_plugins = self::get_all_plugins();
+        
         foreach ($specs as $s) {
             $file = $s['file'];
             $req  = $s['version'] ?? null;
@@ -264,7 +303,13 @@ final class ActivationUtils
                 continue;
             }
 
-            $current = self::get_plugin_version($file);
+            // Use cached plugin data instead of calling get_plugin_version().
+            $current = null;
+            if (isset($all_plugins[$file]['Version'])) {
+                $ver = (string) $all_plugins[$file]['Version'];
+                $current = $ver !== '' ? $ver : null;
+            }
+
             if ($current !== null && !self::satisfies_version($current, $req)) {
                 \error_log(\sprintf(
                     '[PluginActivator] Version mismatch: %s requires %s, found %s.',
@@ -294,6 +339,9 @@ final class ActivationUtils
 
         $specs    = self::normalize_to_specs($input);
         $deferred = [];
+        
+        // Get all plugin data once for the entire batch.
+        $all_plugins = self::get_all_plugins();
 
         foreach ($specs as $s) {
             $file     = $s['file'];
@@ -311,7 +359,13 @@ final class ActivationUtils
             }
 
             if ($expr) {
-                $current = self::get_plugin_version($file);
+                // Use cached plugin data instead of calling get_plugin_version().
+                $current = null;
+                if (isset($all_plugins[$file]['Version'])) {
+                    $ver = (string) $all_plugins[$file]['Version'];
+                    $current = $ver !== '' ? $ver : null;
+                }
+                
                 if ($current === null || !self::satisfies_version($current, $expr)) {
                     // If active, deactivate it.
                     if (is_plugin_active($file)) {
@@ -386,9 +440,7 @@ final class ActivationUtils
      */
     public static function check_version(string $file, string $constraint): bool
     {
-        self::ensure_wp_plugin_api();
-
-        $plugins = get_plugins();
+        $plugins = self::get_all_plugins(); // ← Uses cache instead of direct get_plugins()
         if (!isset($plugins[$file]['Version'])) {
             return false;
         }
