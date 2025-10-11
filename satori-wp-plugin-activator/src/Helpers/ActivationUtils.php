@@ -73,6 +73,7 @@ final class ActivationUtils
             self::ensure_wp_plugin_api();
             self::$plugin_cache = get_plugins();
         }
+
         return self::$plugin_cache;
     }
 
@@ -292,10 +293,8 @@ final class ActivationUtils
     public static function check_versions(array $input): void
     {
         $specs = self::normalize_to_specs($input);
-        
         // Get all plugin data once for the entire batch.
         $all_plugins = self::get_all_plugins();
-        
         foreach ($specs as $s) {
             $file = $s['file'];
             $req  = $s['version'] ?? null;
@@ -339,7 +338,7 @@ final class ActivationUtils
 
         $specs    = self::normalize_to_specs($input);
         $deferred = [];
-        
+
         // Get all plugin data once for the entire batch.
         $all_plugins = self::get_all_plugins();
 
@@ -365,7 +364,7 @@ final class ActivationUtils
                     $ver = (string) $all_plugins[$file]['Version'];
                     $current = $ver !== '' ? $ver : null;
                 }
-                
+
                 if ($current === null || !self::satisfies_version($current, $expr)) {
                     // If active, deactivate it.
                     if (is_plugin_active($file)) {
