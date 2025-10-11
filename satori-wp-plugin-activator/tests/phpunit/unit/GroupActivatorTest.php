@@ -81,11 +81,11 @@ test('GroupActivator can be constructed with valid config', function () {
 test('GroupActivator has required interface methods', function () {
     expect(method_exists($this->activator, 'collect'))->toBeTrue();
     expect(method_exists($this->activator, 'handle'))->toBeTrue();
-    expect(method_exists($this->activator, 'getType'))->toBeTrue();
+    expect(method_exists($this->activator, 'get_type'))->toBeTrue();
 });
 
-test('getType returns correct activator type', function () {
-    expect($this->activator->getType())->toBe('group');
+test('get_type returns correct activator type', function () {
+    expect($this->activator->get_type())->toBe('group');
 });
 
 test('collect returns array of group items for matching URL', function () {

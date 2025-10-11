@@ -71,11 +71,11 @@ test('PluginActivator can be constructed with valid config', function () {
 test('PluginActivator has required interface methods', function () {
     expect(method_exists($this->activator, 'collect'))->toBeTrue();
     expect(method_exists($this->activator, 'handle'))->toBeTrue();
-    expect(method_exists($this->activator, 'getType'))->toBeTrue();
+    expect(method_exists($this->activator, 'get_type'))->toBeTrue();
 });
 
-test('getType returns correct activator type', function () {
-    expect($this->activator->getType())->toBe('plugin');
+test('get_type returns correct activator type', function () {
+    expect($this->activator->get_type())->toBe('plugin');
 });
 
 test('collect returns array of plugin items', function () {

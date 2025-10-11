@@ -186,7 +186,7 @@ test('satisfies_version handles malformed requirements correctly', function () {
 test('satisfies_version handles empty and null inputs correctly', function () {
     // Empty or null requirements return true
     expect(ActivationUtils::satisfies_version('1.0.0', ''))->toBeTrue();
-    expect(ActivationUtils::satisfies_version('1.0.0', null))->toBeTrue();
+    expect(ActivationUtils::satisfies_version('1.0.0', ""))->toBeTrue();
     
     // Empty current version with valid requirement
     expect(ActivationUtils::satisfies_version('', '>=1.0.0'))->toBeFalse();

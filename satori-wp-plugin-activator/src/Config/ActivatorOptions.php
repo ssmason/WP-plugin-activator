@@ -6,19 +6,34 @@
  * the plugin activator entirely. This class is loaded before the
  * activator controller runs, so the toggle is always available.
  *
- * @package SatoriDigital\PluginActivator\Config
+ * @category Plugin_Activator
+ * @package  SatoriDigital\PluginActivator\Config
+ * @author   Satori Digital
+ * @license  GPL-2.0+
+ * @link     https://satoridigital.com
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace SatoriDigital\PluginActivator\Config;
 
-class ActivatorOptions {
-
+/**
+ * Class ActivatorOptions
+ *
+ * Manages the WordPress admin settings page for the Plugin Activator system.
+ * Provides a toggle interface to enable/disable the entire activation system
+ * and handles the storage of this preference in WordPress options.
+ *
+ * @package SatoriDigital\PluginActivator\Config
+ * @since   1.0.0
+ */
+class ActivatorOptions
+{
     /**
      * Option name used to store the "disable activator" toggle in the database.
      *
      * @var string
+     * @since 1.0.0
      */
     private string $option_name = 'satori_plugin_activator_disabled';
 
@@ -26,22 +41,27 @@ class ActivatorOptions {
      * Constructor.
      *
      * Hooks into WordPress to register the settings page, fields, and styles.
+     *
+     * @since 1.0.0
      */
-    public function __construct() {
-        add_action( 'admin_menu', [ $this, 'register_options_page' ] );
-        add_action( 'admin_init', [ $this, 'register_setting' ] );
-        add_action( 'admin_head', [ $this, 'toggle_styles' ] );
+    public function __construct()
+    {
+        add_action('admin_menu', [ $this, 'register_options_page' ]);
+        add_action('admin_init', [ $this, 'register_setting' ]);
+        add_action('admin_head', [ $this, 'toggle_styles' ]);
     }
 
     /**
      * Register the "Plugin Activator" settings page under the Settings menu.
      *
      * @return void
+     * @since 1.0.0
      */
-    public function register_options_page(): void {
+    public function register_options_page(): void
+    {
         add_options_page(
-            __( 'Plugin Activator', 'satori-plugin-activator' ),
-            __( 'Plugin Activator', 'satori-plugin-activator' ),
+            __('Plugin Activator', 'satori-plugin-activator'),
+            __('Plugin Activator', 'satori-plugin-activator'),
             'manage_options',
             'satori-plugin-activator',
             [ $this, 'render_options_page' ]
@@ -52,28 +72,30 @@ class ActivatorOptions {
      * Register the setting, section, and custom toggle field.
      *
      * @return void
+     * @since 1.0.0
      */
-    public function register_setting(): void {
+    public function register_setting(): void
+    {
         register_setting(
             'satori_plugin_activator_settings',
             $this->option_name,
             [
                 'type'              => 'boolean',
-                'sanitize_callback' => fn( $value ): bool => (bool) $value,
+                'sanitize_callback' => fn($value): bool => (bool) $value,
                 'default'           => false,
             ]
         );
 
         add_settings_section(
             'satori_plugin_activator_main_section',
-            __( 'Plugin Activator Settings', 'satori-plugin-activator' ),
+            __('Plugin Activator Settings', 'satori-plugin-activator'),
             '__return_false',
             'satori-plugin-activator'
         );
 
         add_settings_field(
             'disable_activator',
-            __( 'Disable Plugin Activator', 'satori-plugin-activator' ),
+            __('Disable Plugin Activator', 'satori-plugin-activator'),
             [ $this, 'render_field' ],
             'satori-plugin-activator',
             'satori_plugin_activator_main_section'
@@ -85,21 +107,23 @@ class ActivatorOptions {
      * Uses custom markup to display a modern sliding toggle.
      *
      * @return void
+     * @since 1.0.0
      */
-    public function render_field(): void {
-        $value = (bool) get_option( $this->option_name, false );
+    public function render_field(): void
+    {
+        $value = (bool) get_option($this->option_name, false);
         ?>
         <label class="satori-switch">
             <input
                 type="checkbox"
-                name="<?php echo esc_attr( $this->option_name ); ?>"
+                name="<?php echo esc_attr($this->option_name); ?>"
                 value="1"
-                <?php checked( $value ); ?>
+                <?php checked($value); ?>
             />
             <span class="satori-slider"></span>
         </label>
         <p class="description">
-            <?php esc_html_e( 'Turn this on to disable automatic plugin activation.', 'satori-plugin-activator' ); ?>
+            <?php esc_html_e('Turn this on to disable automatic plugin activation.', 'satori-plugin-activator'); ?>
         </p>
         <?php
     }
@@ -108,15 +132,17 @@ class ActivatorOptions {
      * Render the full options page wrapper.
      *
      * @return void
+     * @since 1.0.0
      */
-    public function render_options_page(): void {
+    public function render_options_page(): void
+    {
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'Plugin Activator Settings', 'satori-plugin-activator' ); ?></h1>
+            <h1><?php esc_html_e('Plugin Activator Settings', 'satori-plugin-activator'); ?></h1>
 
             <form method="post" action="options.php">
-                <?php settings_fields( 'satori_plugin_activator_settings' ); ?>
-                <?php do_settings_sections( 'satori-plugin-activator' ); ?>
+                <?php settings_fields('satori_plugin_activator_settings'); ?>
+                <?php do_settings_sections('satori-plugin-activator'); ?>
                 <?php submit_button(); ?>
             </form>
         </div>
@@ -127,19 +153,23 @@ class ActivatorOptions {
      * Check if the activator is currently disabled via the option.
      *
      * @return bool True if the activator should be disabled, false otherwise.
+     * @since 1.0.0
      */
-    public function is_disabled(): bool {
-        return (bool) get_option( $this->option_name, false );
+    public function is_disabled(): bool
+    {
+        return (bool) get_option($this->option_name, false);
     }
 
     /**
      * Output custom CSS for the toggle switch, only on the settings page.
      *
      * @return void
+     * @since 1.0.0
      */
-    public function toggle_styles(): void {
+    public function toggle_styles(): void
+    {
         $screen = get_current_screen();
-        if ( ! $screen || $screen->id !== 'settings_page_satori-plugin-activator' ) {
+        if (! $screen || $screen->id !== 'settings_page_satori-plugin-activator') {
             return;
         }
         ?>
@@ -178,7 +208,7 @@ class ActivatorOptions {
                 border-radius: 50%;
             }
             .satori-switch input:checked + .satori-slider {
-                background-color: #d63638; /* WP blue */
+                background-color: #d63638; /* WP red for disabled state */
             }
             .satori-switch input:checked + .satori-slider:before {
                 transform: translateX(26px);

@@ -124,11 +124,11 @@ test('FilterActivator can be constructed with valid config', function () {
 test('FilterActivator has required interface methods', function () {
     expect(method_exists($this->activator, 'collect'))->toBeTrue();
     expect(method_exists($this->activator, 'handle'))->toBeTrue();
-    expect(method_exists($this->activator, 'getType'))->toBeTrue();
+    expect(method_exists($this->activator, 'get_type'))->toBeTrue();
 });
 
-test('getType returns correct activator type', function () {
-    expect($this->activator->getType())->toBe('filter'); // Changed from 'filtered' to 'filter'
+test('get_type returns correct activator type', function () {
+    expect($this->activator->get_type())->toBe('filter'); // Changed from 'filtered' to 'filter'
 });
 
 test('collect returns array of filtered items', function () {

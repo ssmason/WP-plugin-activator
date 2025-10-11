@@ -18,7 +18,7 @@ if ( ! file_exists($tests_dir . '/includes/functions.php') ) {
 if (!defined('WP_ADMIN')) define('WP_ADMIN', true);
 
 // Theme activation
-$theme_slug = getenv('THEME_SLUG') ?: 'ct-custom';
+// $theme_slug = getenv('THEME_SLUG') ?: 'ct-custom';
 $theme_root = realpath( dirname( dirname( __DIR__ ) ) ); // .../wp-content/themes
 
 // Pre-load test functions to hook before WP boots
@@ -26,8 +26,8 @@ require_once $tests_dir . '/includes/functions.php';
 
 // Point WordPress at our theme and force it active
 tests_add_filter('theme_root', fn() => $theme_root);
-tests_add_filter('pre_option_template',   fn() => $theme_slug);
-tests_add_filter('pre_option_stylesheet', fn() => $theme_slug);
+// tests_add_filter('pre_option_template',   fn() => $theme_slug);
+// tests_add_filter('pre_option_stylesheet', fn() => $theme_slug);
 
 // (Optional) ensure directory is registered
 tests_add_filter('muplugins_loaded', function() use ($theme_root) {

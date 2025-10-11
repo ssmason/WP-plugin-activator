@@ -139,6 +139,8 @@ it('diagnostic - understanding toggle behavior', function () {
         
         $isActive = is_plugin_active($this->slug);
         $toggleValue = get_option('satori_plugin_activator_toggle');
+        
+        // Log the results for debugging
     }
     
     // Always pass - this is diagnostic

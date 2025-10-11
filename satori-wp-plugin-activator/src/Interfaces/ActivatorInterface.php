@@ -9,13 +9,13 @@
  * @package  SatoriDigital\PluginActivator\Interfaces
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace SatoriDigital\PluginActivator\Interfaces;
 
-interface ActivatorInterface {
-
-	/**
+interface ActivatorInterface
+{
+    /**
      * Collect normalized items for global ordering.
      *
      * Shape per item:
@@ -25,14 +25,14 @@ interface ActivatorInterface {
      *   'data'  => array       // original activator-specific payload
      * ]
      *
-     * @return array<int, array{type:string, order:int, data:array}>
+     * @return array Array of collected items.
      */
     public function collect(): array;
 
     /**
      * Process a single normalized item (called after global sort).
      *
-     * @param array{type:string, order:int, data:array} $item
+     * @param array $item Item containing type, order, and data keys.
      * @return void
      */
     public function handle(array $item): void;
@@ -43,5 +43,5 @@ interface ActivatorInterface {
      *
      * @return string One of: 'plugin'|'filter'|'setting'|'group'
      */
-    public function getType(): string;
+    public function get_type(): string;
 }
