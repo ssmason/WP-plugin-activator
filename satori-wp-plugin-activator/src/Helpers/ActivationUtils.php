@@ -335,10 +335,10 @@ final class ActivationUtils
     public static function activate_plugins(array $input): void
     {
         self::ensure_wp_plugin_api();
-        
+
         $specs = self::normalize_to_specs($input);
         $validation_results = self::validate_plugin_batch($specs);
-        
+
         self::process_immediate_activations($validation_results['immediate']);
         self::process_deferred_activations($validation_results['deferred']);
     }
@@ -361,7 +361,7 @@ final class ActivationUtils
 
         foreach ($specs as $spec) {
             $validation = self::validate_single_plugin_spec($spec, $all_plugins);
-            
+
             if (!$validation['valid']) {
                 continue;
             }
@@ -396,13 +396,13 @@ final class ActivationUtils
         $required = (bool)($spec['required'] ?? false);
         $version_expr = $spec['version'] ?? null;
 
-        // Check file existence
+        // Check file existence.
         if (!self::plugin_file_exists($file)) {
             self::handle_missing_plugin_file($file, $required);
             return ['valid' => false, 'reason' => 'missing_file'];
         }
 
-        // Check version constraints
+        // Check version constraints.
         if ($version_expr) {
             $version_valid = self::validate_plugin_version_constraint($file, $version_expr, $all_plugins);
             if (!$version_valid) {
@@ -419,12 +419,15 @@ final class ActivationUtils
      *
      * @param string $file Plugin file path.
      * @param string $version_expr Version constraint expression.
-     * @param array $all_plugins Cached plugin data.
+     * @param array  $all_plugins Cached plugin data.
      * @return bool True if version constraint is satisfied.
      * @since 1.0.0
      */
-    private static function validate_plugin_version_constraint(string $file, string $version_expr, array $all_plugins): bool
-    {
+    private static function validate_plugin_version_constraint(
+        string $file,
+        string $version_expr,
+        array $all_plugins
+    ): bool {
         $current = null;
         if (isset($all_plugins[$file]['Version'])) {
             $ver = (string) $all_plugins[$file]['Version'];
@@ -438,14 +441,14 @@ final class ActivationUtils
      * Handle missing plugin file.
      *
      * @param string $file Plugin file path.
-     * @param bool $required Whether the plugin is required.
+     * @param bool   $required Whether the plugin is required.
      * @return void
      * @since 1.0.0
      */
     private static function handle_missing_plugin_file(string $file, bool $required): void
     {
         \error_log(\sprintf('[PluginActivator] Plugin file not found: %s', $file));
-        
+
         if ($required) {
             self::log_missing_plugin($file);
         }

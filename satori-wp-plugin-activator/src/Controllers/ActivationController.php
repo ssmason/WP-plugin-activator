@@ -167,13 +167,13 @@ class ActivationController
             return ['should_activate' => false, 'should_deactivate' => false];
         }
 
-        // Check file existence
+        // Check file existence.
         if (ActivationUtils::is_plugin_file_missing($file)) {
             $this->handle_missing_plugin($file, $required);
             return ['should_activate' => false, 'should_deactivate' => true, 'file' => $file];
         }
 
-        // Check version constraints
+        // Check version constraints.
         if ($version && !ActivationUtils::check_version($file, $version)) {
             ActivationUtils::log_version_mismatch($file, $version);
             return ['should_activate' => false, 'should_deactivate' => true, 'file' => $file];
@@ -186,7 +186,7 @@ class ActivationController
      * Handle missing plugin file.
      *
      * @param string $file Plugin file path.
-     * @param bool $required Whether plugin is required.
+     * @param bool   $required Whether plugin is required.
      * @return void
      * @since 1.0.0
      */

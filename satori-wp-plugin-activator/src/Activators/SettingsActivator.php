@@ -107,7 +107,7 @@ final class SettingsActivator implements ActivatorInterface
     public function handle(array $item): void
     {
         $condition_config = $this->extract_condition_config($item);
-        
+
         if ($this->evaluate_condition($condition_config)) {
             $this->activate_conditional_plugins($condition_config['plugins']);
         }
@@ -123,7 +123,7 @@ final class SettingsActivator implements ActivatorInterface
     private function extract_condition_config(array $item): array
     {
         $data = $item['data'];
-        
+
         return [
             'field'    => $data['field'],
             'operator' => $data['operator'] ?? 'equals',
@@ -194,7 +194,7 @@ final class SettingsActivator implements ActivatorInterface
         if (!is_string($actual) || !is_string($expected)) {
             return false;
         }
-        
+
         return strpos($actual, $expected) !== false;
     }
 
@@ -211,7 +211,7 @@ final class SettingsActivator implements ActivatorInterface
         if (!is_array($expected)) {
             return false;
         }
-        
+
         return in_array($actual, $expected, true);
     }
 

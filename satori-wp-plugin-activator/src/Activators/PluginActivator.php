@@ -104,7 +104,7 @@ final class PluginActivator implements ActivatorInterface
         $plugin_config = $this->extract_plugin_config($item);
 
         if (!$this->validate_plugin_requirements($plugin_config)) {
-            return; // Validation failed, don't activate
+            return; // Validation failed, don't activate.
         }
 
         $this->activate_plugin($plugin_config);
@@ -173,7 +173,7 @@ final class PluginActivator implements ActivatorInterface
      * Handle missing plugin file.
      *
      * @param string $file Plugin file path.
-     * @param bool $required Whether plugin is required.
+     * @param bool   $required Whether plugin is required.
      * @return void
      * @since 1.0.0
      */
@@ -199,7 +199,7 @@ final class PluginActivator implements ActivatorInterface
         $version_constraint = $config['version'];
         $required = $config['required'];
 
-        // No version constraint specified
+        // No version constraint specified.
         if (empty($version_constraint)) {
             return true;
         }
@@ -208,7 +208,7 @@ final class PluginActivator implements ActivatorInterface
 
         if ($current_version === null) {
             $this->handle_missing_version($file);
-            return true; // Continue activation even without version info
+            return true; // Continue activation even without version info.
         }
 
         if (ActivationUtils::satisfies_version($current_version, $version_constraint)) {
@@ -216,7 +216,7 @@ final class PluginActivator implements ActivatorInterface
         }
 
         $this->handle_version_mismatch($file, $version_constraint, $current_version, $required);
-        return true; // Continue activation despite version mismatch (current behavior)
+        return true; // Continue activation despite version mismatch (current behavior).
     }
 
     /**
@@ -237,12 +237,16 @@ final class PluginActivator implements ActivatorInterface
      * @param string $file Plugin file path.
      * @param string $required_version Required version constraint.
      * @param string $current_version Current installed version.
-     * @param bool $required Whether plugin is required.
+     * @param bool   $required Whether plugin is required.
      * @return void
      * @since 1.0.0
      */
-    private function handle_version_mismatch(string $file, string $required_version, string $current_version, bool $required): void
-    {
+    private function handle_version_mismatch(
+        string $file,
+        string $required_version,
+        string $current_version,
+        bool $required
+    ): void {
         error_log(sprintf(
             '[PluginActivator] Version mismatch for %s. Required %s, found %s.',
             $file,

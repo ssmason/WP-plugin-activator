@@ -77,7 +77,7 @@ final class GroupActivator implements ActivatorInterface
         }
 
         $matching_group = $this->find_matching_environment_group();
-        
+
         if (!$matching_group) {
             return [];
         }
@@ -121,7 +121,7 @@ final class GroupActivator implements ActivatorInterface
     /**
      * Check if group configuration matches current URL.
      *
-     * @param array $group_config Group configuration.
+     * @param array  $group_config Group configuration.
      * @param string $current_url Current site URL.
      * @return bool True if group matches current environment.
      * @since 1.0.0
@@ -129,7 +129,7 @@ final class GroupActivator implements ActivatorInterface
     private function does_group_match_current_url(array $group_config, string $current_url): bool
     {
         $group_url = !empty($group_config['url']) ? rtrim($group_config['url'], '/') : null;
-        
+
         return $group_url && $group_url === $current_url;
     }
 
@@ -149,7 +149,7 @@ final class GroupActivator implements ActivatorInterface
         $items = [];
         foreach ($plugins as $plugin) {
             $formatted_item = $this->format_plugin_item($plugin, $group_name);
-            
+
             if ($formatted_item) {
                 $items[] = $formatted_item;
             }
@@ -161,7 +161,7 @@ final class GroupActivator implements ActivatorInterface
     /**
      * Format a single plugin configuration into collection item.
      *
-     * @param array $plugin Plugin configuration.
+     * @param array  $plugin Plugin configuration.
      * @param string $group_name Group name for error logging.
      * @return array|null Formatted item or null if invalid.
      * @since 1.0.0
@@ -204,7 +204,7 @@ final class GroupActivator implements ActivatorInterface
     public function handle(array $item): void
     {
         $plugin_data = $this->extract_plugin_data($item);
-        
+
         $this->validate_plugin_version($plugin_data);
         $this->activate_group_plugin($plugin_data);
     }
@@ -231,15 +231,15 @@ final class GroupActivator implements ActivatorInterface
     private function validate_plugin_version(array $plugin_data): void
     {
         $required_version = $plugin_data['version'] ?? null;
-        
+
         if (empty($required_version)) {
-            return; // No version constraint to validate
+            return; // No version constraint to validate.
         }
 
         $current_version = ActivationUtils::get_plugin_version($plugin_data['file']);
-        
+
         if ($current_version === null) {
-            return; // Can't validate without current version
+            return; // Can't validate without current version.
         }
 
         if (!ActivationUtils::satisfies_version($current_version, $required_version)) {
