@@ -335,59 +335,165 @@ final class ActivationUtils
     public static function activate_plugins(array $input): void
     {
         self::ensure_wp_plugin_api();
+        
+        $specs = self::normalize_to_specs($input);
+        $validation_results = self::validate_plugin_batch($specs);
+        
+        self::process_immediate_activations($validation_results['immediate']);
+        self::process_deferred_activations($validation_results['deferred']);
+    }
 
-        $specs    = self::normalize_to_specs($input);
+    /**
+     * Validate a batch of plugin specifications.
+     *
+     * Checks file existence and version constraints for all plugins,
+     * separating them into immediate and deferred activation queues.
+     *
+     * @param array $specs Normalized plugin specifications.
+     * @return array Array with 'immediate' and 'deferred' plugin file lists.
+     * @since 1.0.0
+     */
+    private static function validate_plugin_batch(array $specs): array
+    {
+        $all_plugins = self::get_all_plugins();
+        $immediate = [];
         $deferred = [];
 
-        // Get all plugin data once for the entire batch.
-        $all_plugins = self::get_all_plugins();
-
-        foreach ($specs as $s) {
-            $file     = $s['file'];
-            $required = (bool)($s['required'] ?? false);
-            $expr     = $s['version']  ?? null;
-            $defer    = (bool)($s['defer']    ?? false);
-
-            if (!self::plugin_file_exists($file)) {
-                \error_log(\sprintf('[PluginActivator] Plugin file not found: %s', $file));
-                if ($required) {
-                    self::log_missing_plugin($file);
-                }
-
+        foreach ($specs as $spec) {
+            $validation = self::validate_single_plugin_spec($spec, $all_plugins);
+            
+            if (!$validation['valid']) {
                 continue;
             }
 
-            if ($expr) {
-                // Use cached plugin data instead of calling get_plugin_version().
-                $current = null;
-                if (isset($all_plugins[$file]['Version'])) {
-                    $ver = (string) $all_plugins[$file]['Version'];
-                    $current = $ver !== '' ? $ver : null;
-                }
-
-                if ($current === null || !self::satisfies_version($current, $expr)) {
-                    // If active, deactivate it.
-                    if (is_plugin_active($file)) {
-                        deactivate_plugins([$file], false, is_multisite());
-                        \error_log(\sprintf('[PluginActivator] Deactivated due to version mismatch: %s', $file));
-                    }
-
-                    continue; // Skip activation entirely.
-                }
+            if ($spec['defer']) {
+                $deferred[] = $spec['file'];
+            } else {
+                $immediate[] = $spec['file'];
             }
+        }
 
-            if ($defer) {
-                $deferred[] = $file;
-                continue;
+        return [
+            'immediate' => $immediate,
+            'deferred'  => $deferred,
+        ];
+    }
+
+    /**
+     * Validate a single plugin specification.
+     *
+     * Checks file existence and version constraints for one plugin.
+     * Handles missing files and version mismatches appropriately.
+     *
+     * @param array $spec Plugin specification.
+     * @param array $all_plugins Cached plugin data from WordPress.
+     * @return array Validation result with 'valid' boolean.
+     * @since 1.0.0
+     */
+    private static function validate_single_plugin_spec(array $spec, array $all_plugins): array
+    {
+        $file = $spec['file'];
+        $required = (bool)($spec['required'] ?? false);
+        $version_expr = $spec['version'] ?? null;
+
+        // Check file existence
+        if (!self::plugin_file_exists($file)) {
+            self::handle_missing_plugin_file($file, $required);
+            return ['valid' => false, 'reason' => 'missing_file'];
+        }
+
+        // Check version constraints
+        if ($version_expr) {
+            $version_valid = self::validate_plugin_version_constraint($file, $version_expr, $all_plugins);
+            if (!$version_valid) {
+                self::handle_version_constraint_failure($file);
+                return ['valid' => false, 'reason' => 'version_mismatch'];
             }
+        }
 
+        return ['valid' => true];
+    }
+
+    /**
+     * Validate plugin version against constraint.
+     *
+     * @param string $file Plugin file path.
+     * @param string $version_expr Version constraint expression.
+     * @param array $all_plugins Cached plugin data.
+     * @return bool True if version constraint is satisfied.
+     * @since 1.0.0
+     */
+    private static function validate_plugin_version_constraint(string $file, string $version_expr, array $all_plugins): bool
+    {
+        $current = null;
+        if (isset($all_plugins[$file]['Version'])) {
+            $ver = (string) $all_plugins[$file]['Version'];
+            $current = $ver !== '' ? $ver : null;
+        }
+
+        return $current !== null && self::satisfies_version($current, $version_expr);
+    }
+
+    /**
+     * Handle missing plugin file.
+     *
+     * @param string $file Plugin file path.
+     * @param bool $required Whether the plugin is required.
+     * @return void
+     * @since 1.0.0
+     */
+    private static function handle_missing_plugin_file(string $file, bool $required): void
+    {
+        \error_log(\sprintf('[PluginActivator] Plugin file not found: %s', $file));
+        
+        if ($required) {
+            self::log_missing_plugin($file);
+        }
+    }
+
+    /**
+     * Handle version constraint failure.
+     *
+     * Deactivates plugin if currently active due to version mismatch.
+     *
+     * @param string $file Plugin file path.
+     * @return void
+     * @since 1.0.0
+     */
+    private static function handle_version_constraint_failure(string $file): void
+    {
+        if (is_plugin_active($file)) {
+            deactivate_plugins([$file], false, is_multisite());
+            \error_log(\sprintf('[PluginActivator] Deactivated due to version mismatch: %s', $file));
+        }
+    }
+
+    /**
+     * Process immediate plugin activations.
+     *
+     * @param array $plugin_files Array of plugin file paths to activate immediately.
+     * @return void
+     * @since 1.0.0
+     */
+    private static function process_immediate_activations(array $plugin_files): void
+    {
+        foreach ($plugin_files as $file) {
             if (!is_plugin_active($file)) {
                 activate_plugin($file, '', false, true);
             }
         }
+    }
 
-        // Activate deferred plugins last.
-        foreach ($deferred as $file) {
+    /**
+     * Process deferred plugin activations.
+     *
+     * @param array $plugin_files Array of plugin file paths to activate after immediate ones.
+     * @return void
+     * @since 1.0.0
+     */
+    private static function process_deferred_activations(array $plugin_files): void
+    {
+        foreach ($plugin_files as $file) {
             if (!is_plugin_active($file)) {
                 activate_plugin($file, '', false, true);
             }
