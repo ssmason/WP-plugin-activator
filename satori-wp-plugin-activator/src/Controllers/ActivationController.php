@@ -116,47 +116,112 @@ class ActivationController
      */
     protected function process_activation(array $items): void
     {
-        $to_activate   = [];
+        $validation_results = $this->validate_plugin_items($items);
+
+        $this->execute_deactivations($validation_results['to_deactivate']);
+        $this->execute_activations($validation_results['to_activate']);
+    }
+
+    /**
+     * Validate plugin items and categorize for activation/deactivation.
+     *
+     * @param array $items Plugin items to validate.
+     * @return array Arrays of plugins to activate and deactivate.
+     * @since 1.0.0
+     */
+    private function validate_plugin_items(array $items): array
+    {
+        $to_activate = [];
         $to_deactivate = [];
 
         foreach ($items as $item) {
-            $file     = $item['file'] ?? null;
-            $version  = $item['version'] ?? null;
-            $required = $item['required'] ?? false;
+            $validation = $this->validate_single_item($item);
 
-            if (! $file) {
-                continue;
+            if ($validation['should_activate']) {
+                $to_activate[] = $validation['file'];
+            } elseif ($validation['should_deactivate']) {
+                $to_deactivate[] = $validation['file'];
             }
-
-            // Check if file exists and handle missing files.
-            if (ActivationUtils::is_plugin_file_missing($file)) {
-                if ($required) {
-                    ActivationUtils::log_missing_plugin($file);
-                }
-
-                $to_deactivate[] = $file;
-                continue;
-            }
-
-            // Version constraint validation.
-            if ($version && ! ActivationUtils::check_version($file, $version)) {
-                ActivationUtils::log_version_mismatch($file, $version);
-                $to_deactivate[] = $file;
-                continue;
-            }
-
-            // Add to activation queue.
-            $to_activate[] = $file;
         }
 
-        // Deactivate plugins not required or failing checks.
-        if (! empty($to_deactivate)) {
-            ActivationUtils::deactivate_plugins($to_deactivate);
+        return [
+            'to_activate' => $to_activate,
+            'to_deactivate' => $to_deactivate,
+        ];
+    }
+
+    /**
+     * Validate a single plugin item.
+     *
+     * @param array $item Plugin item to validate.
+     * @return array Validation result with actions to take.
+     * @since 1.0.0
+     */
+    private function validate_single_item(array $item): array
+    {
+        $file = $item['file'] ?? null;
+        $version = $item['version'] ?? null;
+        $required = $item['required'] ?? false;
+
+        if (!$file) {
+            return ['should_activate' => false, 'should_deactivate' => false];
         }
 
-        // Activate required plugins in sorted order.
-        if (! empty($to_activate)) {
-            ActivationUtils::activate_plugins($to_activate);
+        // Check file existence
+        if (ActivationUtils::is_plugin_file_missing($file)) {
+            $this->handle_missing_plugin($file, $required);
+            return ['should_activate' => false, 'should_deactivate' => true, 'file' => $file];
+        }
+
+        // Check version constraints
+        if ($version && !ActivationUtils::check_version($file, $version)) {
+            ActivationUtils::log_version_mismatch($file, $version);
+            return ['should_activate' => false, 'should_deactivate' => true, 'file' => $file];
+        }
+
+        return ['should_activate' => true, 'should_deactivate' => false, 'file' => $file];
+    }
+
+    /**
+     * Handle missing plugin file.
+     *
+     * @param string $file Plugin file path.
+     * @param bool $required Whether plugin is required.
+     * @return void
+     * @since 1.0.0
+     */
+    private function handle_missing_plugin(string $file, bool $required): void
+    {
+        if ($required) {
+            ActivationUtils::log_missing_plugin($file);
+        }
+    }
+
+    /**
+     * Execute plugin deactivations.
+     *
+     * @param array $plugins Array of plugin files to deactivate.
+     * @return void
+     * @since 1.0.0
+     */
+    private function execute_deactivations(array $plugins): void
+    {
+        if (!empty($plugins)) {
+            ActivationUtils::deactivate_plugins($plugins);
+        }
+    }
+
+    /**
+     * Execute plugin activations.
+     *
+     * @param array $plugins Array of plugin files to activate.
+     * @return void
+     * @since 1.0.0
+     */
+    private function execute_activations(array $plugins): void
+    {
+        if (!empty($plugins)) {
+            ActivationUtils::activate_plugins($plugins);
         }
     }
 }
