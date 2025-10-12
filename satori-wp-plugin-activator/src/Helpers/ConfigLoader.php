@@ -50,18 +50,18 @@ class ConfigLoader
     public function load(): array
     {
         $theme = get_option('stylesheet', '');
-        
-        // Check if we have cached config for this theme
+
+        // Check if we have cached config for this theme.
         if (isset(self::$config_cache[$theme])) {
             return self::$config_cache[$theme];
         }
 
         $config = $this->get_json_config($theme);
         $normalized = $this->normalize_config($config);
-        
-        // Cache the normalized configuration
+
+        // Cache the normalized configuration.
         self::$config_cache[$theme] = $normalized;
-        
+
         return $normalized;
     }
 
