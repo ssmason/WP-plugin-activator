@@ -92,9 +92,8 @@ final class PluginActivator implements ActivatorInterface
     /**
      * Handle a single plugin item activation.
      *
-     * Performs comprehensive validation including file existence, version
-     * constraints, and requirement flags before attempting plugin activation.
-     * Logs detailed information about any issues encountered.
+     * Orchestrates the plugin activation process by validating
+     * requirements and activating if all conditions are met.
      *
      * @param array $item Plugin item containing activation data.
      * @return void
@@ -102,42 +101,173 @@ final class PluginActivator implements ActivatorInterface
      */
     public function handle(array $item): void
     {
-        $p    = $item['data'];
-        $file = $p['file'];
-        $req  = $p['required'] ?? false;
-        $ver  = $p['version']  ?? null;
+        $plugin_config = $this->extract_plugin_config($item);
 
-        // File existence check.
-        if (!ActivationUtils::plugin_file_exists($file)) {
-            error_log(sprintf('[PluginActivator] Plugin file not found: %s', $file));
-            if (!empty($req)) {
-                error_log(sprintf('[PluginActivator] REQUIRED plugin missing: %s', $file));
-            }
-
-            return;
+        if (!$this->validate_plugin_requirements($plugin_config)) {
+            return; // Validation failed, don't activate
         }
 
-        // Version constraint validation.
-        if (!empty($ver)) {
-            $current = ActivationUtils::get_plugin_version($file);
-            if ($current !== null && !ActivationUtils::satisfies_version($current, $ver)) {
-                error_log(sprintf(
-                    '[PluginActivator] Version mismatch for %s. Required %s, found %s.',
-                    $file,
-                    $ver,
-                    $current
-                ));
-                if (!empty($req)) {
-                    error_log(sprintf(
-                        '[PluginActivator] REQUIRED plugin %s does not meet version %s. Proceeding to activate anyway.',
-                        $file,
-                        $ver
-                    ));
-                }
-            }
+        $this->activate_plugin($plugin_config);
+    }
+
+    /**
+     * Extract plugin configuration from item data.
+     *
+     * @param array $item Plugin item data.
+     * @return array Plugin configuration with normalized fields.
+     * @since 1.0.0
+     */
+    private function extract_plugin_config(array $item): array
+    {
+        $data = $item['data'];
+
+        return [
+            'file'     => $data['file'],
+            'required' => $data['required'] ?? false,
+            'version'  => $data['version'] ?? null,
+            'data'     => $data,
+        ];
+    }
+
+    /**
+     * Validate all plugin requirements.
+     *
+     * @param array $config Plugin configuration.
+     * @return bool True if all requirements are satisfied.
+     * @since 1.0.0
+     */
+    private function validate_plugin_requirements(array $config): bool
+    {
+        if (!$this->validate_file_exists($config)) {
+            return false;
         }
 
-        // Activate plugin using utility methods.
-        ActivationUtils::activate_plugins([$p]);
+        if (!$this->validate_version_constraint($config)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate plugin file existence.
+     *
+     * @param array $config Plugin configuration.
+     * @return bool True if file exists or validation passes.
+     * @since 1.0.0
+     */
+    private function validate_file_exists(array $config): bool
+    {
+        $file = $config['file'];
+        $required = $config['required'];
+
+        if (ActivationUtils::plugin_file_exists($file)) {
+            return true;
+        }
+
+        $this->handle_missing_file($file, $required);
+        return false;
+    }
+
+    /**
+     * Handle missing plugin file.
+     *
+     * @param string $file Plugin file path.
+     * @param bool $required Whether plugin is required.
+     * @return void
+     * @since 1.0.0
+     */
+    private function handle_missing_file(string $file, bool $required): void
+    {
+        error_log(sprintf('[PluginActivator] Plugin file not found: %s', $file));
+
+        if ($required) {
+            error_log(sprintf('[PluginActivator] REQUIRED plugin missing: %s', $file));
+        }
+    }
+
+    /**
+     * Validate plugin version constraint.
+     *
+     * @param array $config Plugin configuration.
+     * @return bool True if version constraint is satisfied or not applicable.
+     * @since 1.0.0
+     */
+    private function validate_version_constraint(array $config): bool
+    {
+        $file = $config['file'];
+        $version_constraint = $config['version'];
+        $required = $config['required'];
+
+        // No version constraint specified
+        if (empty($version_constraint)) {
+            return true;
+        }
+
+        $current_version = ActivationUtils::get_plugin_version($file);
+
+        if ($current_version === null) {
+            $this->handle_missing_version($file);
+            return true; // Continue activation even without version info
+        }
+
+        if (ActivationUtils::satisfies_version($current_version, $version_constraint)) {
+            return true;
+        }
+
+        $this->handle_version_mismatch($file, $version_constraint, $current_version, $required);
+        return true; // Continue activation despite version mismatch (current behavior)
+    }
+
+    /**
+     * Handle missing version information.
+     *
+     * @param string $file Plugin file path.
+     * @return void
+     * @since 1.0.0
+     */
+    private function handle_missing_version(string $file): void
+    {
+        error_log(sprintf('[PluginActivator] No version information found for: %s', $file));
+    }
+
+    /**
+     * Handle version constraint mismatch.
+     *
+     * @param string $file Plugin file path.
+     * @param string $required_version Required version constraint.
+     * @param string $current_version Current installed version.
+     * @param bool $required Whether plugin is required.
+     * @return void
+     * @since 1.0.0
+     */
+    private function handle_version_mismatch(string $file, string $required_version, string $current_version, bool $required): void
+    {
+        error_log(sprintf(
+            '[PluginActivator] Version mismatch for %s. Required %s, found %s.',
+            $file,
+            $required_version,
+            $current_version
+        ));
+
+        if ($required) {
+            error_log(sprintf(
+                '[PluginActivator] REQUIRED plugin %s does not meet version %s. Proceeding to activate anyway.',
+                $file,
+                $required_version
+            ));
+        }
+    }
+
+    /**
+     * Activate the plugin using utility methods.
+     *
+     * @param array $config Plugin configuration.
+     * @return void
+     * @since 1.0.0
+     */
+    private function activate_plugin(array $config): void
+    {
+        ActivationUtils::activate_plugins([$config['data']]);
     }
 }
