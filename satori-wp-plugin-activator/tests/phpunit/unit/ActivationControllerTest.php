@@ -9,7 +9,7 @@ namespace P\Tests\Unit;
 
 use SatoriDigital\PluginActivator\Controllers\ActivationController;
 
-// Mock WordPress functions if they don't exist
+
 if (!function_exists('add_action')) {
     function add_action($tag, $function_to_add, $priority = 10, $accepted_args = 1) {
         global $mock_actions;
@@ -70,14 +70,14 @@ if (!function_exists('wp_unslash')) {
 }
 
 beforeEach(function () {
-    // Reset global mocks
+
     global $mock_actions, $mock_redirect_location, $mock_user_capabilities, $mock_nonce_check;
     $mock_actions = [];
     $mock_redirect_location = null;
     $mock_user_capabilities = ['manage_options'];
     $mock_nonce_check = true;
     
-    // Clear $_GET and $_POST
+
     $_GET = [];
     $_POST = [];
     
@@ -85,7 +85,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    // Clean up globals
+
     global $mock_actions, $mock_redirect_location, $mock_user_capabilities, $mock_nonce_check;
     $mock_actions = [];
     $mock_redirect_location = null;
@@ -107,41 +107,37 @@ test('controller registers WordPress hooks on run', function () {
     $this->controller->run();
     
     expect($mock_actions)->toBeArray();
-    
-    // The controller might not register hooks on every run() call
-    // Let's test what it actually does - might register hooks conditionally
-    // For now, just verify it doesn't crash and mock_actions is initialized
     expect(true)->toBeTrue(); // Always pass - just verify no exceptions
 });
 
 test('controller handles plugin activation request with valid permissions', function () {
     global $mock_redirect_location;
     
-    // Set up valid activation request
+
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = 'test-plugin/test-plugin.php';
     $_GET['redirect'] = admin_url('plugins.php');
     
     $this->controller->run();
     
-    // Should not throw exception and should process the request
-    expect(true)->toBeTrue(); // Basic test that it doesn't crash
+
+    expect(true)->toBeTrue();
 });
 
 test('controller handles plugin activation with multiple plugins', function () {
-    // Set up request with multiple plugins
+
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = 'plugin1/plugin1.php,plugin2/plugin2.php';
     $_GET['redirect'] = admin_url('plugins.php');
     
     $result = $this->controller->run();
     
-    // Add assertion to avoid risky test warning
-    expect($result)->toBeIn([null, true, false]); // Controller might return various values
+
+    expect($result)->toBeIn([null, true, false]);
 });
 
 test('controller handles JSON plugin specification', function () {
-    // Set up request with JSON plugin spec
+
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = json_encode([
         ['file' => 'plugin1/plugin1.php', 'version' => '>=1.0.0'],
@@ -150,42 +146,32 @@ test('controller handles JSON plugin specification', function () {
     $_GET['redirect'] = admin_url('plugins.php');
     
     $result = $this->controller->run();
-    
-    // Add assertion to avoid risky test warning
     expect($result)->toBeIn([null, true, false]);
 });
 
 test('controller rejects requests without proper permissions', function () {
     global $mock_user_capabilities;
     
-    // Remove manage_options capability
+
     $mock_user_capabilities = [];
     
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    
-    // The controller might not check permissions or might handle it differently
-    // Let's test what actually happens
     $result = $this->controller->run();
     
-    // Just verify it handles the case without crashing
     expect($result)->toBeIn([null, true, false]);
 });
 
 test('controller validates nonce for security', function () {
     global $mock_nonce_check;
     
-    // Set nonce check to fail
+
     $mock_nonce_check = false;
     
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    
-    // The controller might not check nonces or handle it differently
     $result = $this->controller->run();
-    
-    // Just verify it handles the case without crashing
-    expect($result)->toBeIn([null, true, false]);
+        expect($result)->toBeIn([null, true, false]);
 });
 
 test('controller handles empty plugin list gracefully', function () {
@@ -195,22 +181,22 @@ test('controller handles empty plugin list gracefully', function () {
     
     $result = $this->controller->run();
     
-    // Add assertion to avoid risky test warning
+
     expect($result)->toBeIn([null, true, false]);
 });
 
 test('controller ignores non-activation requests', function () {
     global $mock_actions;
     
-    // Set up non-activation request
+
     $_GET['action'] = 'some_other_action';
     $_GET['plugins'] = 'test-plugin/test-plugin.php';
     
     $this->controller->run();
     
-    // Should register hooks but not process activation
+
     expect($mock_actions)->toBeArray();
-    expect(true)->toBeTrue(); // Should not crash
+    expect(true)->toBeTrue();
 });
 
 test('controller handles malformed JSON gracefully', function () {
@@ -220,19 +206,19 @@ test('controller handles malformed JSON gracefully', function () {
     
     $result = $this->controller->run();
     
-    // Add assertion to avoid risky test warning
+
     expect($result)->toBeIn([null, true, false]);
 });
 
 test('controller sanitizes input parameters', function () {
-    // Set up request with potentially dangerous input
+
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = '<script>alert("xss")</script>test-plugin/test-plugin.php';
     $_GET['redirect'] = 'javascript:alert("xss")';
     
     $result = $this->controller->run();
     
-    // Add assertion to avoid risky test warning
+
     expect($result)->toBeIn([null, true, false]);
 });
 
@@ -244,8 +230,6 @@ test('controller redirects after successful activation', function () {
     $_GET['redirect'] = admin_url('plugins.php?activated=1');
     
     $this->controller->run();
-    
-    // The controller might not redirect - just test that it's either null or string
     expect($mock_redirect_location === null || is_string($mock_redirect_location))->toBeTrue();
 });
 
@@ -254,16 +238,16 @@ test('controller has default redirect when none specified', function () {
     
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    // No redirect parameter
+
     
     $this->controller->run();
     
-    // Handle the null case properly
+
     if ($mock_redirect_location !== null) {
         expect($mock_redirect_location)->toBeString();
         expect($mock_redirect_location)->toContain('plugins.php');
     } else {
-        // Controller might not redirect at all
+
         expect($mock_redirect_location)->toBeNull();
     }
 });
@@ -271,29 +255,29 @@ test('controller has default redirect when none specified', function () {
 test('controller method visibility and structure', function () {
     $reflection = new \ReflectionClass(ActivationController::class);
     
-    // Check that class is properly structured
+
     expect($reflection->isInstantiable())->toBeTrue();
     expect($reflection->hasMethod('run'))->toBeTrue();
     
-    // Check run method is public
+
     $runMethod = $reflection->getMethod('run');
     expect($runMethod->isPublic())->toBeTrue();
 });
 
 test('controller handles POST requests as well as GET', function () {
-    // Test with POST data instead of GET
+
     $_POST['action'] = 'activate_plugins';
     $_POST['plugins'] = 'test-plugin/test-plugin.php';
     $_POST['redirect'] = admin_url('plugins.php');
     
     $result = $this->controller->run();
     
-    // Add assertion to avoid risky test warning
+
     expect($result)->toBeIn([null, true, false]);
 });
 
 test('controller integration test with complex plugin specs', function () {
-    // Test with a complex, realistic plugin specification
+
     $complexSpec = [
         'required_plugins' => [
             ['file' => 'woocommerce/woocommerce.php', 'version' => '>=8.0.0'],
@@ -311,52 +295,52 @@ test('controller integration test with complex plugin specs', function () {
     
     $result = $this->controller->run();
     
-    // Add assertion to avoid risky test warning
+
     expect($result)->toBeIn([null, true, false]);
 });
 
-// Add a diagnostic test to understand what the controller actually does
+
 test('diagnostic - understanding controller behavior', function () {
     global $mock_actions, $mock_redirect_location, $mock_user_capabilities;
     
-    // Set up a typical request
+
     $_GET['action'] = 'activate_plugins';
     $_GET['plugins'] = 'test-plugin/test-plugin.php';
     $_GET['redirect'] = admin_url('plugins.php');
     
-    // Reset globals
+
     $mock_actions = [];
     $mock_redirect_location = null;
     
     $result = $this->controller->run();
     
-    // Debug what actually happens
+
     $actionsCount = count($mock_actions);
     $hasRedirect = $mock_redirect_location !== null;
     
-    // Log the results for debugging
+
     expect($actionsCount)->toBeInt(); // Always passes
     expect($hasRedirect)->toBeIn([true, false]); // Always passes
     expect($result)->toBeIn([null, true, false]); // Always passes
     
-    // Always pass - this is diagnostic
+
     expect(true)->toBeTrue();
 });
 
-// Add a test that focuses on what we know works
+
 test('controller basic functionality verification', function () {
-    // Test that controller exists and can be called
+
     expect($this->controller)->toBeInstanceOf(ActivationController::class);
     
-    // Test that run method can be called without parameters
+
     expect(method_exists($this->controller, 'run'))->toBeTrue();
     
-    // Test that calling run() doesn't throw fatal errors
+
     expect(function () {
         $this->controller->run();
     })->not->toThrow(\Error::class);
     
-    // Test with various $_GET scenarios
+
     $_GET['action'] = 'activate_plugins';
     expect(function () {
         $this->controller->run();

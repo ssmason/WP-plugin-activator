@@ -5,17 +5,6 @@
       "required": true,
       "version": ">=1.6",
       "order": 5
-    },
-    {
-      "file": "wordpress-seo/wp-seo.php",
-      "required": false,
-      "version": ">=21.0",
-      "order": 15
-    },
-    {
-      "file": "query-monitor/query-monitor.php",
-      "required": false,
-      "order": 50
     }
   ],
 

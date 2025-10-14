@@ -10,7 +10,7 @@ use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 beforeEach(function () {
     $this->slug = create_dummy_plugin('dummy-filter-execution', '1.0.0');
     
-    // Clean up any existing hooks
+
     remove_all_actions('satori_activation_test_hook');
     remove_all_filters('satori_plugin_activation_test_false');
     remove_all_filters('satori_plugin_activation_test_exception');
@@ -29,7 +29,7 @@ afterEach(function () {
         @rmdir($pluginDir);
     }
     
-    // Clean up additional test plugins
+
     $testPlugins = ['dummy-filter-exception', 'dummy-filter-multiple', 'dummy-filter-priority'];
     foreach ($testPlugins as $pluginName) {
         if (is_plugin_active($pluginName . '/' . $pluginName . '.php')) {
@@ -42,7 +42,7 @@ afterEach(function () {
         }
     }
 
-    // Clean up all test hooks
+
     remove_all_actions('satori_activation_test_hook');
     remove_all_filters('satori_plugin_activation_test_false');
     remove_all_filters('satori_plugin_activation_test_exception');
@@ -66,10 +66,10 @@ it('activates the plugin when the filtered hook is triggered', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Verify plugin is not active before hook
+
     expect(is_plugin_active($this->slug))->toBeFalse();
 
-    // Fire the valid hook
+
     do_action($hook);
 
     ActivationUtils::activate_plugins($collected);
@@ -93,17 +93,15 @@ it('processes plugins with filter that returns false', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Verify the filter works as expected
+
     $result = apply_filters($filterName, true);
     expect($result)->toBeFalse();
     
-    // Test that the activation process completes without errors
+
     expect(function () use ($collected) {
         ActivationUtils::activate_plugins($collected);
     })->not->toThrow(\Exception::class);
-    
-    // The FilterActivator's actual behavior might be different than expected
-    // Just verify it processes plugins consistently
+
     expect($collected)->toBeArray();
 });
 
@@ -122,7 +120,7 @@ it('processes plugins with missing filters', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
     
-    // Test that activation completes without errors
+
     expect(function () use ($collected) {
         ActivationUtils::activate_plugins($collected);
     })->not->toThrow(\Exception::class);
@@ -149,12 +147,12 @@ it('processes plugins when filters throw exceptions', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Verify the filter throws as expected
+
     expect(function () use ($filterName) {
         apply_filters($filterName, true);
     })->toThrow(\Exception::class, 'Boom!');
 
-    // Test that activation handles filter exceptions gracefully
+
     expect(function () use ($collected) {
         ActivationUtils::activate_plugins($collected);
     })->not->toThrow(\Exception::class);
@@ -178,10 +176,10 @@ it('handles exceptions thrown during filtered activation gracefully', function (
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Activate plugins first
+
     ActivationUtils::activate_plugins($collected);
 
-    // Add a hook that throws an exception after activation
+
     add_action($hook, function () {
         throw new \Exception('Boom from filtered hook!');
     }, 20);
@@ -197,11 +195,11 @@ it('handles exceptions thrown during filtered activation gracefully', function (
     expect($exceptionCaught)->toBeTrue();
     expect(is_plugin_active($slug))->toBeTrue();
     
-    // Clean up
+
     deactivate_plugins($slug, true);
 });
 
-// Additional comprehensive tests
+
 
 it('handles multiple plugins with same hook', function () {
     $slug2 = create_dummy_plugin('dummy-filter-multiple', '1.0.0');
@@ -220,19 +218,19 @@ it('handles multiple plugins with same hook', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Verify both plugins are inactive
+
     expect(is_plugin_active($this->slug))->toBeFalse();
     expect(is_plugin_active($slug2))->toBeFalse();
 
-    // Fire the hook
+
     do_action($hook);
     ActivationUtils::activate_plugins($collected);
 
-    // Both plugins should be activated
+
     expect(is_plugin_active($this->slug))->toBeTrue();
     expect(is_plugin_active($slug2))->toBeTrue();
     
-    // Clean up
+
     deactivate_plugins($slug2, true);
 });
 
@@ -260,7 +258,7 @@ it('handles different priorities correctly', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Add hooks to track execution order
+
     add_action($hook, function () use (&$executionOrder) {
         $executionOrder[] = 'priority_5';
     }, 5);
@@ -269,16 +267,16 @@ it('handles different priorities correctly', function () {
         $executionOrder[] = 'priority_15';
     }, 15);
 
-    // Fire the hook
+
     do_action($hook);
     ActivationUtils::activate_plugins($collected);
 
-    // Check execution order
+
     expect($executionOrder)->toBe(['priority_5', 'priority_15']);
     expect(is_plugin_active($this->slug))->toBeTrue();
     expect(is_plugin_active($slug2))->toBeTrue();
     
-    // Clean up
+
     deactivate_plugins($slug2, true);
 });
 
@@ -298,29 +296,29 @@ it('handles empty plugin list gracefully', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Fire the hook
+
     do_action($hook);
     ActivationUtils::activate_plugins($collected);
 
-    // No plugins should be activated
+
     expect(is_plugin_active($this->slug))->toBeFalse();
     expect($collected)->toBeArray();
 });
 
 it('validates FilterActivator configuration structure', function () {
-    // Test with missing 'filtered' key
+
     $config = [];
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
     expect($collected)->toBeArray();
     
-    // Test with empty 'filtered' array
+
     $config = ['filtered' => []];
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
     expect($collected)->toBeArray();
     
-    // Test with malformed configuration
+
     $config = ['filtered' => [['plugins' => [$this->slug]]]]; // Missing hook
     $activator = new FilterActivator($config);
     
@@ -333,12 +331,12 @@ it('handles filter hooks vs action hooks appropriately', function () {
     $filterHook = 'satori_test_filter_hook';
     $actionHook = 'satori_test_action_hook';
 
-    // Test filter hook
+
     add_filter($filterHook, function ($value) {
         return $value . '_filtered';
     });
 
-    // Test action hook  
+
     $actionFired = false;
     add_action($actionHook, function () use (&$actionFired) {
         $actionFired = true;
@@ -356,11 +354,11 @@ it('handles filter hooks vs action hooks appropriately', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Test filter execution
+
     $result = apply_filters($filterHook, 'test');
     expect($result)->toBe('test_filtered');
 
-    // Test action execution
+
     do_action($actionHook);
     expect($actionFired)->toBeTrue();
 
@@ -371,7 +369,7 @@ it('handles filter hooks vs action hooks appropriately', function () {
 it('supports conditional activation based on filter return values', function () {
     $filterHook = 'satori_conditional_activation';
     
-    // Add filter that returns true for activation
+
     add_filter($filterHook, function ($shouldActivate, $pluginSlug) {
         return $pluginSlug === $this->slug ? true : false;
     }, 10, 2);
@@ -388,7 +386,7 @@ it('supports conditional activation based on filter return values', function () 
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Test conditional logic
+
     $shouldActivate = apply_filters($filterHook, false, $this->slug);
     expect($shouldActivate)->toBeTrue();
 
@@ -403,7 +401,7 @@ it('handles large number of hooks and plugins', function () {
     $hooks = [];
     $slugs = [];
     
-    // Create multiple hooks and plugins
+
     for ($i = 1; $i <= 5; $i++) {
         $hooks[] = "satori_test_hook_{$i}";
         $slugs[] = create_dummy_plugin("dummy-filter-test-{$i}", '1.0.0');
@@ -421,14 +419,14 @@ it('handles large number of hooks and plugins', function () {
     $activator = new FilterActivator($config);
     $collected = $activator->collect();
 
-    // Fire all hooks
+
     foreach ($hooks as $hook) {
         do_action($hook);
     }
 
     ActivationUtils::activate_plugins($collected);
 
-    // Check all plugins are activated
+
     foreach ($slugs as $slug) {
         expect(is_plugin_active($slug))->toBeTrue();
         deactivate_plugins($slug, true);

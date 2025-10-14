@@ -14,7 +14,7 @@ function create_dummy_plugin($slug = 'dummy-plugin', $version = '1.2.3') {
         */\n";
         file_put_contents($file, $contents);
     }
-    // Ensure WordPress detects it freshly
+
     if (function_exists('wp_clean_plugins_cache')) {
         wp_clean_plugins_cache();
     }

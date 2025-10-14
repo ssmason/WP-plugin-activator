@@ -46,9 +46,9 @@ class ActivatorOptions
      */
     public function __construct()
     {
-        add_action('admin_menu', [ $this, 'register_options_page' ]);
-        add_action('admin_init', [ $this, 'register_setting' ]);
-        add_action('admin_head', [ $this, 'toggle_styles' ]);
+        add_action('admin_menu', [$this, 'register_options_page']);
+        add_action('admin_init', [$this, 'register_settings_configuration']);
+        add_action('admin_head', [$this, 'maybe_output_styles']);
     }
 
     /**
@@ -64,17 +64,30 @@ class ActivatorOptions
             __('Plugin Activator', 'satori-plugin-activator'),
             'manage_options',
             'satori-plugin-activator',
-            [ $this, 'render_options_page' ]
+            [$this, 'render_options_page']
         );
     }
 
     /**
-     * Register the setting, section, and custom toggle field.
+     * Register all settings configuration.
      *
      * @return void
      * @since 1.0.0
      */
-    public function register_setting(): void
+    public function register_settings_configuration(): void
+    {
+        $this->register_option();
+        $this->register_section();
+        $this->register_field();
+    }
+
+    /**
+     * Register the main setting option.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function register_option(): void
     {
         register_setting(
             'satori_plugin_activator_settings',
@@ -85,31 +98,48 @@ class ActivatorOptions
                 'default'           => false,
             ]
         );
+    }
 
+    /**
+     * Register the settings section.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function register_section(): void
+    {
         add_settings_section(
             'satori_plugin_activator_main_section',
             __('Plugin Activator Settings', 'satori-plugin-activator'),
             '__return_false',
             'satori-plugin-activator'
         );
+    }
 
+    /**
+     * Register the settings field.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function register_field(): void
+    {
         add_settings_field(
             'disable_activator',
             __('Disable Plugin Activator', 'satori-plugin-activator'),
-            [ $this, 'render_field' ],
+            [$this, 'render_toggle_field'],
             'satori-plugin-activator',
             'satori_plugin_activator_main_section'
         );
     }
 
     /**
-     * Render the toggle field for enabling/disabling the plugin activator.
-     * Uses custom markup to display a modern sliding toggle.
+     * Render the toggle input field.
      *
      * @return void
      * @since 1.0.0
      */
-    public function render_field(): void
+    public function render_toggle_field(): void
     {
         $value = (bool) get_option($this->option_name, false);
         ?>
@@ -122,6 +152,19 @@ class ActivatorOptions
             />
             <span class="satori-slider"></span>
         </label>
+        <?php
+        $this->render_field_description();
+    }
+
+    /**
+     * Render the field description.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function render_field_description(): void
+    {
+        ?>
         <p class="description">
             <?php esc_html_e('Turn this on to disable automatic plugin activation.', 'satori-plugin-activator'); ?>
         </p>
@@ -161,17 +204,40 @@ class ActivatorOptions
     }
 
     /**
-     * Output custom CSS for the toggle switch, only on the settings page.
+     * Output styles only if on the correct page.
      *
      * @return void
      * @since 1.0.0
      */
-    public function toggle_styles(): void
+    public function maybe_output_styles(): void
     {
-        $screen = get_current_screen();
-        if (! $screen || $screen->id !== 'settings_page_satori-plugin-activator') {
+        if (!$this->is_settings_page()) {
             return;
         }
+
+        $this->output_toggle_styles();
+    }
+
+    /**
+     * Check if currently on the plugin activator settings page.
+     *
+     * @return bool True if on settings page.
+     * @since 1.0.0
+     */
+    private function is_settings_page(): bool
+    {
+        $screen = get_current_screen();
+        return $screen && $screen->id === 'settings_page_satori-plugin-activator';
+    }
+
+    /**
+     * Output CSS styles for the toggle switch.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function output_toggle_styles(): void
+    {
         ?>
         <style>
             .satori-switch {
