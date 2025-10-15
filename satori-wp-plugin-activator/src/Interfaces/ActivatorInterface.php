@@ -30,14 +30,6 @@ interface ActivatorInterface
     public function collect(): array;
 
     /**
-     * Process a single normalized item (called after global sort).
-     *
-     * @param array $item Item containing type, order, and data keys.
-     * @return void
-     */
-    public function handle(array $item): void;
-
-    /**
      * The type key this activator is responsible for.
      * Used by the controller to route items back to the correct activator.
      *

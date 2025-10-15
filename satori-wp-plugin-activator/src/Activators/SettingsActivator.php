@@ -72,6 +72,7 @@ final class SettingsActivator implements ActivatorInterface
      */
     public function collect(): array
     {
+
         $items = [];
         foreach ($this->settings as $s) {
             if (
@@ -81,6 +82,10 @@ final class SettingsActivator implements ActivatorInterface
                 || !is_array($s['plugins'])
             ) {
                 error_log('[SettingsActivator] Invalid settings entry (need field, value, plugins[]).');
+                continue;
+            }
+
+            if (! $this->handle($s)) {
                 continue;
             }
 
@@ -101,16 +106,14 @@ final class SettingsActivator implements ActivatorInterface
      * the configured condition and activating plugins if met.
      *
      * @param array $item Settings item containing condition and plugin data.
-     * @return void
+     * @return bool True if condition is satisfied and plugins should be activated.
      * @since 1.0.0
      */
-    public function handle(array $item): void
+    public function handle(array $item): bool
     {
+        error_log('[SettingsActivator] Handling settings item: ' . json_encode($item));
         $condition_config = $this->extract_condition_config($item);
-
-        if ($this->evaluate_condition($condition_config)) {
-            $this->activate_conditional_plugins($condition_config['plugins']);
-        }
+        return  $this->evaluate_condition($condition_config);
     }
 
     /**
@@ -122,14 +125,13 @@ final class SettingsActivator implements ActivatorInterface
      */
     private function extract_condition_config(array $item): array
     {
-        $data = $item['data'];
 
         return [
-            'field'    => $data['field'],
-            'operator' => $data['operator'] ?? 'equals',
-            'expected' => $data['value'],
-            'plugins'  => $data['plugins'],
-            'actual'   => get_option($data['field']),
+            'field'    => $item['field'],
+            'operator' => $item['operator'] ?? 'equals',
+            'expected' => $item['value'],
+            'plugins'  => $item['plugins'],
+            'actual'   => get_option($item['field']),
         ];
     }
 
@@ -142,9 +144,11 @@ final class SettingsActivator implements ActivatorInterface
      */
     private function evaluate_condition(array $config): bool
     {
+
         $operator = $config['operator'];
         $actual = $config['actual'];
         $expected = $config['expected'];
+
 
         return match ($operator) {
             'equals'     => $this->compare_equals($actual, $expected),
@@ -165,6 +169,10 @@ final class SettingsActivator implements ActivatorInterface
      */
     private function compare_equals($actual, $expected): bool
     {
+        if ($actual === false) {
+            return false;
+        }
+
         return (string)$actual === (string)$expected;
     }
 
@@ -213,17 +221,5 @@ final class SettingsActivator implements ActivatorInterface
         }
 
         return in_array($actual, $expected, true);
-    }
-
-    /**
-     * Activate plugins based on satisfied condition.
-     *
-     * @param array $plugins Array of plugin specifications to activate.
-     * @return void
-     * @since 1.0.0
-     */
-    private function activate_conditional_plugins(array $plugins): void
-    {
-        ActivationUtils::activate_plugins($plugins);
     }
 }

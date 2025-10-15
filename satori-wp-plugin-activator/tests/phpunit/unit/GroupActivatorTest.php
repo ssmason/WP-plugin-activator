@@ -5,8 +5,6 @@
 
 declare(strict_types=1);
 
-namespace P\Tests\Unit;
-
 use SatoriDigital\PluginActivator\Activators\GroupActivator;
 
 

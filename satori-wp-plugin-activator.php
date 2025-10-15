@@ -22,14 +22,18 @@ use SatoriDigital\PluginActivator\Controllers\ActivationController;
 // Instantiate options immediately so it's always available
 $options = new ActivatorOptions();
 
-// Respect the option before bootstrapping the activator
-if ( ! $options->is_disabled() ) {
-    add_action( 'after_setup_theme', function() {
-		if ( ! defined( 'SATORI_PLUGIN_ACTIVATOR_LOADED' ) ) {
-			define( 'SATORI_PLUGIN_ACTIVATOR_LOADED', true );
-			( new ActivationController() )->run();
-		}
-	});
+error_log ('Plugin Activator - is_disabled: ' . $options->is_disabled() );
+if ( $options->is_disabled() ) {
+    // Do nothing
+    return;
 }
+ 
+add_action( 'after_setup_theme', function() {
+	if ( ! defined( 'SATORI_PLUGIN_ACTIVATOR_LOADED' ) ) {
+		define( 'SATORI_PLUGIN_ACTIVATOR_LOADED', true );
+		( new ActivationController() )->run();
+	}
+});
+
 
 

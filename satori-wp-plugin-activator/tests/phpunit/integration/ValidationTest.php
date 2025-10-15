@@ -37,11 +37,17 @@ if (!function_exists('_evaluate_plugins_local')) {
         foreach ($config['plugins'] as $plugin) {
             $file = $plugin['file'] ?? '';
             $version = $plugin['version'] ?? null;
+            $required = $plugin['required'] ?? false; // ✅ ADD THIS LINE
             $full_path = WP_PLUGIN_DIR . '/' . $file;
-
 
             $exists = mock_file_exists($full_path);
             if (!$exists) {
+                // ✅ ADD THESE LINES
+                if ($required) {
+                    error_log('[PluginActivator] REQUIRED plugin missing: ' . $file);
+                } else {
+                    error_log('[PluginActivator] Optional plugin missing: ' . $file);
+                }
                 $missing[] = $file;
                 continue;
             }
@@ -70,10 +76,18 @@ if (!function_exists('_evaluate_plugins_local')) {
                 $version_check_passes = $activation_utils_check ?: $simple_check;
                 
                 if (!$version_check_passes) {
+                    // ✅ ADD THESE LINES
+                    if ($required) {
+                        error_log('[PluginActivator] REQUIRED plugin version mismatch: ' . $file);
+                    } else {
+                        error_log('[PluginActivator] Optional plugin version mismatch: ' . $file);
+                    }
+                    
                     $version_issues[] = [
                         'slug'     => $file,
                         'current'  => $current_version,
                         'required' => $version,
+                        'is_required' => $required, // ✅ ADD THIS LINE
                     ];
                     continue;
                 }

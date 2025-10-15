@@ -5,15 +5,12 @@
 
 declare(strict_types=1);
 
-namespace P\Tests\Unit;
-
 use SatoriDigital\PluginActivator\Activators\PluginActivator;
 
 
 if (!defined('WP_PLUGIN_DIR')) {
     define('WP_PLUGIN_DIR', '/fake/plugin/dir');
 }
-
 
 function mock_plugin_file_exists($file) {
     global $mock_existing_plugins;
@@ -70,7 +67,6 @@ test('PluginActivator can be constructed with valid config', function () {
 
 test('PluginActivator has required interface methods', function () {
     expect(method_exists($this->activator, 'collect'))->toBeTrue();
-    expect(method_exists($this->activator, 'handle'))->toBeTrue();
     expect(method_exists($this->activator, 'get_type'))->toBeTrue();
 });
 
@@ -92,12 +88,8 @@ test('collect returns array of plugin items', function () {
 });
 
 test('collect filters plugins by order correctly', function () {
-    $items = $this->activator->collect();
-    
-
-    expect($items)->not->toBeEmpty();
-    
-
+    $items = $this->activator->collect(); 
+    expect($items)->not->toBeEmpty(); 
     foreach ($items as $item) {
         expect($item['data'])->toHaveKey('order');
         expect($item['data']['order'])->toBeInt();
@@ -106,7 +98,6 @@ test('collect filters plugins by order correctly', function () {
 
 test('PluginActivator handles empty config gracefully', function () {
     $emptyActivator = new PluginActivator(['plugins' => []]);
-    
     $items = $emptyActivator->collect();
     expect($items)->toBeArray();
     expect($items)->toBeEmpty();
@@ -114,7 +105,6 @@ test('PluginActivator handles empty config gracefully', function () {
 
 test('PluginActivator handles malformed config gracefully', function () {
     $malformedActivator = new PluginActivator([]);
-    
     $items = $malformedActivator->collect();
     expect($items)->toBeArray();
     expect($items)->toBeEmpty();
@@ -122,11 +112,9 @@ test('PluginActivator handles malformed config gracefully', function () {
 
 test('handle method processes plugin items correctly', function () {
     $items = $this->activator->collect();
-    
 
     expect($items)->not->toBeEmpty();
     expect($items)->toBeArray();
-    
 
     $firstItem = $items[0];
     expect($firstItem)->toHaveKey('data');
@@ -152,12 +140,6 @@ test('collect returns plugins in correct order', function () {
     $orders = array_map(fn($item) => $item['data']['order'], $items);
     expect($orders)->toContain(5);
     expect($orders)->toContain(10);
-    
-
-
-
-    
-
     foreach ($items as $item) {
         expect($item['data'])->toHaveKeys(['file', 'order', 'required', 'version']);
     }
