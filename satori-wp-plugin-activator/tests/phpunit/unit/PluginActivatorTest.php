@@ -7,79 +7,36 @@ declare(strict_types=1);
 
 use SatoriDigital\PluginActivator\Activators\PluginActivator;
 
-
-if (!defined('WP_PLUGIN_DIR')) {
-    define('WP_PLUGIN_DIR', '/fake/plugin/dir');
-}
-
-function mock_plugin_file_exists($file) {
-    global $mock_existing_plugins;
-    return in_array($file, $mock_existing_plugins ?? []);
-}
-
-function mock_get_plugin_version($file) {
-    global $mock_plugin_versions;
-    return $mock_plugin_versions[$file] ?? '1.0.0';
-}
-
 beforeEach(function () {
-
-    global $mock_existing_plugins, $mock_plugin_versions;
-    $mock_existing_plugins = [
-        'query-monitor/query-monitor.php',
-        'wordpress-seo/wp-seo.php',
-    ];
-    $mock_plugin_versions = [
-        'query-monitor/query-monitor.php' => '3.5.0',
-        'wordpress-seo/wp-seo.php' => '2.1.0',
-    ];
-
-    $this->valid_config = [
+    $this->config = [
         'plugins' => [
             [
-                'file'     => 'query-monitor/query-monitor.php',
-                'required' => false,
-                'version'  => '>=2.0.0',
-                'order'    => 5,
+                'file' => 'plugin-a/plugin-a.php',
+                'order' => 5,
+                'required' => true,
+                'version' => '>=1.0.0',
             ],
             [
-                'file'     => 'debug-bar/debug-bar.php',
-                'required' => true,
-                'version'  => '>=1.0.0', 
-                'order'    => 10,
+                'file' => 'plugin-b/plugin-b.php',
+                'order' => 10,
+            ],
+            [
+                // Missing 'file', should be skipped
+                'order' => 15,
             ],
         ],
     ];
-    
-    $this->activator = new PluginActivator($this->valid_config);
+    $this->activator = new PluginActivator($this->config);
 });
 
-afterEach(function () {
-
-    global $mock_existing_plugins, $mock_plugin_versions;
-    $mock_existing_plugins = [];
-    $mock_plugin_versions = [];
-});
-
-test('PluginActivator can be constructed with valid config', function () {
-    expect($this->activator)->toBeInstanceOf(PluginActivator::class);
-});
-
-test('PluginActivator has required interface methods', function () {
-    expect(method_exists($this->activator, 'collect'))->toBeTrue();
-    expect(method_exists($this->activator, 'get_type'))->toBeTrue();
-});
-
-test('get_type returns correct activator type', function () {
+it('returns correct type from get_type', function () {
     expect($this->activator->get_type())->toBe('plugin');
 });
 
-test('collect returns array of plugin items', function () {
+it('collects and returns correct plugin items', function () {
     $items = $this->activator->collect();
-    
     expect($items)->toBeArray();
-    expect($items)->toHaveCount(2);
-    
+    expect($items)->toHaveCount(2); // Only valid plugins
     foreach ($items as $item) {
         expect($item)->toHaveKeys(['type', 'order', 'data']);
         expect($item['type'])->toBe('plugin');
@@ -87,60 +44,108 @@ test('collect returns array of plugin items', function () {
     }
 });
 
-test('collect filters plugins by order correctly', function () {
-    $items = $this->activator->collect(); 
-    expect($items)->not->toBeEmpty(); 
-    foreach ($items as $item) {
-        expect($item['data'])->toHaveKey('order');
-        expect($item['data']['order'])->toBeInt();
-    }
-});
-
-test('PluginActivator handles empty config gracefully', function () {
-    $emptyActivator = new PluginActivator(['plugins' => []]);
-    $items = $emptyActivator->collect();
-    expect($items)->toBeArray();
-    expect($items)->toBeEmpty();
-});
-
-test('PluginActivator handles malformed config gracefully', function () {
-    $malformedActivator = new PluginActivator([]);
-    $items = $malformedActivator->collect();
-    expect($items)->toBeArray();
-    expect($items)->toBeEmpty();
-});
-
-test('handle method processes plugin items correctly', function () {
+it('collects and sets correct order values', function () {
     $items = $this->activator->collect();
-
-    expect($items)->not->toBeEmpty();
-    expect($items)->toBeArray();
-
-    $firstItem = $items[0];
-    expect($firstItem)->toHaveKey('data');
-    expect($firstItem)->toHaveKey('type');
-    
-
-    $result = null;
-    expect(function () use ($firstItem, &$result) {
-        $result = $this->activator->handle($firstItem);
-        return true;
-    })->not->toThrow(\Exception::class);
-    
-
-    expect(true)->toBeTrue();
+    $orders = array_map(fn($item) => $item['order'], $items);
+    expect($orders)->toBe([5, 10]);
 });
 
-test('collect returns plugins in correct order', function () {
+it('collects and skips plugins with missing file', function () {
     $items = $this->activator->collect();
-    
+    $files = array_map(fn($item) => $item['data']['file'], $items);
+    expect($files)->not->toContain(null);
+    expect($files)->not->toContain('');
+});
+
+it('collects plugin with extra config keys', function () {
+    $config = [
+        'plugins' => [
+            [
+                'file' => 'plugin-x/plugin-x.php',
+                'order' => 1,
+                'required' => true,
+                'version' => '>=2.0.0',
+            ],
+        ],
+    ];
+    $activator = new PluginActivator($config);
+    $items = $activator->collect();
+    expect($items)->toHaveCount(1);
+    expect($items[0]['data']['required'])->toBeTrue();
+    expect($items[0]['data']['version'])->toBe('>=2.0.0');
+});
+
+it('collects multiple plugins with same order value', function () {
+    $config = [
+        'plugins' => [
+            ['file' => 'plugin-a/plugin-a.php', 'order' => 1],
+            ['file' => 'plugin-b/plugin-b.php', 'order' => 1],
+        ],
+    ];
+    $activator = new PluginActivator($config);
+    $items = $activator->collect();
     expect($items)->toHaveCount(2);
-    
+    $orders = array_map(fn($item) => $item['order'], $items);
+    expect($orders)->toBe([1, 1]);
+});
 
-    $orders = array_map(fn($item) => $item['data']['order'], $items);
-    expect($orders)->toContain(5);
-    expect($orders)->toContain(10);
-    foreach ($items as $item) {
-        expect($item['data'])->toHaveKeys(['file', 'order', 'required', 'version']);
-    }
+it('collects empty plugins array', function () {
+    $activator = new PluginActivator(['plugins' => []]);
+    $items = $activator->collect();
+    expect($items)->toBeArray();
+    expect($items)->toHaveCount(0);
+});
+
+it('skips plugin with empty string or null file', function () {
+    $config = [
+        'plugins' => [
+            ['file' => '', 'order' => 1],
+            ['file' => null, 'order' => 2],
+            ['file' => 'plugin-c/plugin-c.php', 'order' => 3],
+        ],
+    ];
+    $activator = new PluginActivator($config);
+    $items = $activator->collect();
+    expect($items)->toHaveCount(1);
+    expect($items[0]['data']['file'])->toBe('plugin-c/plugin-c.php');
+});
+
+it('skips non-array/malformed plugin entry', function () {
+    $config = [
+        'plugins' => [
+            'not-an-array',
+            ['file' => 'plugin-d/plugin-d.php', 'order' => 1],
+        ],
+    ];
+    $activator = new PluginActivator($config);
+    $items = $activator->collect();
+    expect($items)->toHaveCount(1);
+    expect($items[0]['data']['file'])->toBe('plugin-d/plugin-d.php');
+});
+
+it('collects plugin missing optional keys', function () {
+    $config = [
+        'plugins' => [
+            ['file' => 'plugin-e/plugin-e.php'], // no order, required, version
+        ],
+    ];
+    $activator = new PluginActivator($config);
+    $items = $activator->collect();
+    expect($items)->toHaveCount(1);
+    expect($items[0]['data']['file'])->toBe('plugin-e/plugin-e.php');
+    expect($items[0]['order'])->toBe(0); // default order
+});
+
+it('collects plugins with duplicate file values', function () {
+    $config = [
+        'plugins' => [
+            ['file' => 'plugin-f/plugin-f.php', 'order' => 1],
+            ['file' => 'plugin-f/plugin-f.php', 'order' => 2],
+        ],
+    ];
+    $activator = new PluginActivator($config);
+    $items = $activator->collect();
+    expect($items)->toHaveCount(2);
+    $files = array_map(fn($item) => $item['data']['file'], $items);
+    expect($files)->toBe(['plugin-f/plugin-f.php', 'plugin-f/plugin-f.php']);
 });

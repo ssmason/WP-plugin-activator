@@ -85,17 +85,15 @@ final class SettingsActivator implements ActivatorInterface
                 continue;
             }
 
-            if (! $this->handle($s)) {
+            if ( ! $this->handle($s)) {
                 continue;
             }
-
             $items[] = [
                 'type'  => $this->get_type(),
                 'order' => (int)($s['order'] ?? 0),
                 'data'  => $s,
             ];
         }
-
         return $items;
     }
 
@@ -109,9 +107,12 @@ final class SettingsActivator implements ActivatorInterface
      * @return bool True if condition is satisfied and plugins should be activated.
      * @since 1.0.0
      */
-    public function handle(array $item): bool
+    public function handle(array $item): bool 
     {
-        error_log('[SettingsActivator] Handling settings item: ' . json_encode($item));
+        if (!isset($item['field']) || !isset($item['plugins'])) {
+            return false;
+        }
+        error_log('[SettingsActivator] Handling settings item: ' . json_encode($item)); 
         $condition_config = $this->extract_condition_config($item);
         return  $this->evaluate_condition($condition_config);
     }
@@ -124,14 +125,13 @@ final class SettingsActivator implements ActivatorInterface
      * @since 1.0.0
      */
     private function extract_condition_config(array $item): array
-    {
-
+    { 
         return [
-            'field'    => $item['field'],
+            'field'    => $item['field'] ?? '',
             'operator' => $item['operator'] ?? 'equals',
-            'expected' => $item['value'],
-            'plugins'  => $item['plugins'],
-            'actual'   => get_option($item['field']),
+            'expected' => $item['value'] ?? null,
+            'plugins'  => $item['plugins'] ?? [],
+            'actual'   => isset($item['field']) ? get_option($item['field']) : null,
         ];
     }
 
@@ -144,12 +144,12 @@ final class SettingsActivator implements ActivatorInterface
      */
     private function evaluate_condition(array $config): bool
     {
-
+ 
         $operator = $config['operator'];
         $actual = $config['actual'];
         $expected = $config['expected'];
-
-
+ 
+        
         return match ($operator) {
             'equals'     => $this->compare_equals($actual, $expected),
             'not_equals' => $this->compare_not_equals($actual, $expected),
@@ -172,7 +172,6 @@ final class SettingsActivator implements ActivatorInterface
         if ($actual === false) {
             return false;
         }
-
         return (string)$actual === (string)$expected;
     }
 
@@ -222,4 +221,5 @@ final class SettingsActivator implements ActivatorInterface
 
         return in_array($actual, $expected, true);
     }
+
 }

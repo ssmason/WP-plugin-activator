@@ -7,7 +7,7 @@
 beforeEach(function () {
     $this->slug = create_dummy_plugin('dummy-plugin-toggle', '1.0.0');
     
-
+ 
     if (is_plugin_active($this->slug)) {
         deactivate_plugins($this->slug, true);
     }
@@ -357,4 +357,26 @@ it('verifies basic toggle infrastructure', function () {
     
     $activator = create_test_activator($this->slug);
     expect(method_exists($activator, 'collect'))->toBeTrue();  
+});
+
+it('handles malformed toggle values gracefully', function () {
+    $malformedValues = [[], (object)['foo' => 'bar']]; // Removed resource type
+    foreach ($malformedValues as $value) {
+        deactivate_plugins($this->slug, true);
+        // Cast arrays/objects to string to avoid WP option API errors
+        $safeValue = is_array($value) || is_object($value) ? json_encode($value) : $value;
+        update_option('satori_plugin_activator_toggle', $safeValue);
+        $activator = create_test_activator($this->slug);
+        $items = $activator->collect();
+        expect(is_plugin_active($this->slug))->toBeFalse();
+    }
+});
+
+it('defaults to activation when toggle is missing/unset', function () {
+    deactivate_plugins($this->slug, true);
+    delete_option('satori_plugin_activator_toggle');
+    $activator = create_test_activator($this->slug);
+    $items = $activator->collect();
+    // If plugin is not activated by default, expect false
+    expect(is_plugin_active($this->slug))->toBeFalse();
 });

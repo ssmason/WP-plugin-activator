@@ -87,5 +87,5 @@ final class PluginActivator implements ActivatorInterface
         }
 
         return $items;
-    }
+    } 
 }

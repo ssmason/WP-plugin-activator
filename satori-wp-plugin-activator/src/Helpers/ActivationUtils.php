@@ -310,7 +310,7 @@ final class ActivationUtils
             }
 
             if ($current !== null && !self::satisfies_version($current, $req)) {
-                \error_log(\sprintf(
+                error_log(sprintf(
                     '[PluginActivator] Version mismatch: %s requires %s, found %s.',
                     $file,
                     $req,
@@ -447,7 +447,7 @@ final class ActivationUtils
      */
     private static function handle_missing_plugin_file(string $file, bool $required): void
     {
-        \error_log(\sprintf('[PluginActivator] Plugin file not found: %s', $file));
+        error_log(sprintf('[PluginActivator] Plugin file not found: %s', $file));
 
         if ($required) {
             self::log_missing_plugin($file);
@@ -467,7 +467,7 @@ final class ActivationUtils
     {
         if (is_plugin_active($file)) {
             deactivate_plugins([$file], false, is_multisite());
-            \error_log(\sprintf('[PluginActivator] Deactivated due to version mismatch: %s', $file));
+            error_log(sprintf('[PluginActivator] Deactivated due to version mismatch: %s', $file));
         }
     }
 
@@ -529,7 +529,7 @@ final class ActivationUtils
 
         deactivate_plugins($to_deactivate, false, is_multisite());
 
-        \error_log(\sprintf(
+        error_log(sprintf(
             '[PluginActivator] Deactivated unlisted plugins: %s',
             \implode(', ', $to_deactivate)
         ));

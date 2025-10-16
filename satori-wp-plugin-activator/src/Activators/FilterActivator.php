@@ -89,28 +89,5 @@ final class FilterActivator implements ActivatorInterface
 
         return $items;
     }
-
-    /**
-     * Handle a single filtered item activation.
-     *
-     * Sets up WordPress hook listeners that will activate the specified plugins
-     * when the configured hook is triggered. Supports custom priorities for
-     * fine-grained control over activation timing.
-     *
-     * @param array $item Filtered item containing hook and plugin data.
-     * @return void
-     * @since 1.0.0
-     */
-    public function handle(array $item): void
-    {
-        $f        = $item['data'];
-        $hook     = $f['hook'];
-        $priority = (int)($f['priority'] ?? 10);
-        $plugins  = $f['plugins'];
-
-        // Defer activation of these plugins to the specified hook.
-        add_action($hook, static function () use ($plugins) {
-            ActivationUtils::activate_plugins($plugins);
-        }, $priority, 0);
-    }
+ 
 }

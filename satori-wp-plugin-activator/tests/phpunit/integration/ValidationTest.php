@@ -15,7 +15,7 @@ function mock_file_exists($file) {
     return in_array($file, $mock_existing_files ?? []);
 }
 
-
+ 
 function mock_get_plugin_data($file) {
     global $mock_plugin_data;
     return $mock_plugin_data[$file] ?? ['Version' => '1.0.0'];
@@ -36,6 +36,9 @@ if (!function_exists('_evaluate_plugins_local')) {
 
         foreach ($config['plugins'] as $plugin) {
             $file = $plugin['file'] ?? '';
+            if (empty($file)) {
+                continue; // Skip malformed plugin config
+            }
             $version = $plugin['version'] ?? null;
             $required = $plugin['required'] ?? false; // ✅ ADD THIS LINE
             $full_path = WP_PLUGIN_DIR . '/' . $file;
@@ -169,4 +172,80 @@ it('reports plugins to activate, missing, and version issues correctly', functio
     }
 
     expect($hasVersionIssue)->toBeTrue();
+});
+
+it('reports optional plugin missing correctly', function () {
+    $optional_slug = 'optional-plugin/optional-plugin.php';
+    global $mock_existing_files;
+    $mock_existing_files = [WP_PLUGIN_DIR . '/' . $this->valid_slug];
+    $config = [
+        'plugins' => [
+            [
+                'file'     => $this->valid_slug,
+                'required' => true,
+            ],
+            [
+                'file'     => $optional_slug,
+                'required' => false,
+            ],
+        ],
+    ];
+    $report = _evaluate_plugins_local($config);
+    expect($report['missing'])->toContain($optional_slug);
+});
+
+it('reports optional plugin version mismatch correctly', function () {
+    $optional_slug = 'optional-plugin/optional-plugin.php';
+    global $mock_existing_files, $mock_plugin_data;
+    $mock_existing_files = [WP_PLUGIN_DIR . '/' . $optional_slug];
+    $mock_plugin_data = [WP_PLUGIN_DIR . '/' . $optional_slug => ['Version' => '1.0.0']];
+    $config = [
+        'plugins' => [
+            [
+                'file'     => $optional_slug,
+                'required' => false,
+                'version'  => '>=2.0.0',
+            ],
+        ],
+    ];
+    $report = _evaluate_plugins_local($config);
+    $hasVersionIssue = false;
+    foreach ($report['version_issues'] as $issue) {
+        if ($issue['slug'] === $optional_slug && !$issue['is_required']) {
+            $hasVersionIssue = true;
+            break;
+        }
+    }
+    expect($hasVersionIssue)->toBeTrue();
+});
+
+it('activates plugin with no version constraint if present', function () {
+    $slug = 'noversion-plugin/noversion-plugin.php';
+    global $mock_existing_files;
+    $mock_existing_files = [WP_PLUGIN_DIR . '/' . $slug];
+    $config = [
+        'plugins' => [
+            [
+                'file'     => $slug,
+                'required' => true,
+            ],
+        ],
+    ];
+    $report = _evaluate_plugins_local($config);
+    expect($report['to_activate'])->toContain($slug);
+});
+
+it('skips malformed plugin config (missing file key)', function () {
+    $config = [
+        'plugins' => [
+            [
+                'required' => true,
+                'version'  => '>=1.0.0',
+            ],
+        ],
+    ];
+    $report = _evaluate_plugins_local($config);
+    expect($report['to_activate'])->toBeEmpty();
+    expect($report['missing'])->toBeEmpty();
+    expect($report['version_issues'])->toBeEmpty();
 });

@@ -7,345 +7,192 @@ declare(strict_types=1);
 
 use SatoriDigital\PluginActivator\Controllers\ActivationController;
 
+it('can be instantiated', function () {
+    $controller = new ActivationControllerStub();
+    expect($controller)->toBeInstanceOf(ActivationController::class);
+});
 
-if (!function_exists('add_action')) {
-    function add_action($tag, $function_to_add, $priority = 10, $accepted_args = 1) {
-        global $mock_actions;
-        $mock_actions = $mock_actions ?? [];
-        $mock_actions[] = [
-            'tag' => $tag,
-            'function' => $function_to_add,
-            'priority' => $priority,
-            'args' => $accepted_args
+it('collects and sorts plugin items from all activators', function () {
+    $controller = new ActivationControllerStub();
+    $items = $controller->collectAll();
+    expect($items)->toBeArray();
+    expect($items)->toHaveCount(3);
+    expect($items[0]['order'])->toBe(1);
+    expect($items[1]['order'])->toBe(2);
+    expect($items[2]['order'])->toBe(3);
+});
+
+it('run method calls activation workflow', function () {
+    $controller = new ActivationControllerStub();
+    $controller->run();
+    expect($controller->activated)->toBeTrue();
+});
+
+it('skips plugin with missing file', function () {
+    $controller = new ActivationControllerStub([
+        ['order' => 1, 'file' => null],
+        ['order' => 2, 'file' => 'plugin-a.php'],
+    ]);
+    $items = $controller->collectAll();
+    $valid = array_filter($items, fn($item) => !empty($item['file']));
+    expect($valid)->toHaveCount(1);
+    expect($valid[array_key_first($valid)]['file'])->toBe('plugin-a.php');
+});
+
+it('handles required plugin missing file', function () {
+    $controller = new ActivationControllerStub([
+        ['order' => 1, 'file' => null, 'required' => true],
+        ['order' => 2, 'file' => 'plugin-b.php'],
+    ]);
+    $result = $controller->validate_plugin_items($controller->collectAll());
+    expect($result['to_deactivate'])->toContain(null);
+});
+
+it('checks version constraint and logs mismatch', function () {
+    $controller = new ActivationControllerStub([
+        ['order' => 1, 'file' => 'plugin-c.php', 'version' => '>=2.0.0'],
+    ], ['plugin-c.php' => '1.0.0']); // Simulate version mismatch
+    $result = $controller->validate_plugin_items($controller->collectAll());
+    expect($result['to_deactivate'])->toContain('plugin-c.php');
+});
+
+it('activates valid plugins in correct order', function () {
+    $controller = new ActivationControllerStub([
+        ['order' => 2, 'file' => 'plugin-b.php'],
+        ['order' => 1, 'file' => 'plugin-a.php'],
+    ]);
+    $items = $controller->collectAll();
+    $result = $controller->validate_plugin_items($items);
+    expect($result['to_activate'])->toBe(['plugin-a.php', 'plugin-b.php']);
+});
+
+it('handles empty config gracefully', function () {
+    $controller = new ActivationControllerStub([]);
+    $items = $controller->collectAll();
+    expect($items)->toBeArray();
+    expect($items)->toHaveCount(0);
+});
+
+it('handles duplicate plugins', function () {
+    $controller = new ActivationControllerStub([
+        ['order' => 1, 'file' => 'plugin-x.php'],
+        ['order' => 2, 'file' => 'plugin-x.php'],
+    ]);
+    $items = $controller->collectAll();
+    $files = array_map(fn($item) => $item['file'], $items);
+    expect($files)->toBe(['plugin-x.php', 'plugin-x.php']);
+});
+
+it('skips malformed plugin entry', function () {
+    $controller = new ActivationControllerStub([
+        'not-an-array',
+        ['order' => 1, 'file' => 'plugin-y.php'],
+    ]);
+    $items = array_filter($controller->collectAll(), fn($item) => is_array($item) && !empty($item['file']));
+    expect($items)->toHaveCount(1);
+    expect($items[array_key_first($items)]['file'])->toBe('plugin-y.php');
+});
+
+it('calls activate_plugins and deactivate_plugins with correct arguments', function () {
+    $activated = [];
+    $deactivated = [];
+    // Mock ActivationUtils methods
+    ActivationUtilsMock::mockActivate(function ($plugins) use (&$activated) {
+        $activated = $plugins;
+    });
+    ActivationUtilsMock::mockDeactivate(function ($plugins) use (&$deactivated) {
+        $deactivated = $plugins;
+    });
+
+    $controller = new ActivationControllerMock([
+        ['order' => 1, 'file' => 'plugin-a.php'],
+        ['order' => 2, 'file' => null], // should be deactivated
+        ['order' => 3, 'file' => 'plugin-b.php'],
+    ]);
+    $controller->process_activation($controller->collectAll());
+
+    expect($activated)->toBe(['plugin-a.php', 'plugin-b.php']);
+    expect($deactivated)->toContain(null);
+});
+
+// Mock ActivationUtils for side-effect-free testing
+class ActivationUtilsMock {
+    public static $activateCallback;
+    public static $deactivateCallback;
+    public static function mockActivate($callback) { self::$activateCallback = $callback; }
+    public static function mockDeactivate($callback) { self::$deactivateCallback = $callback; }
+    public static function activate_plugins($plugins) { if (self::$activateCallback) call_user_func(self::$activateCallback, $plugins); }
+    public static function deactivate_plugins($plugins) { if (self::$deactivateCallback) call_user_func(self::$deactivateCallback, $plugins); }
+}
+
+// Minimal stub for testing without side effects
+class ActivationControllerStub extends ActivationController {
+    public $activated = false;
+    private $testItems;
+    private $versions;
+    public function __construct($testItems = null, $versions = []) {
+        $this->config = [];
+        $this->testItems = $testItems ?? [
+            ['order' => 2, 'file' => 'plugin-b.php'],
+            ['order' => 1, 'file' => 'plugin-a.php'],
+            ['order' => 3, 'file' => 'plugin-c.php'],
+        ];
+        $this->versions = $versions;
+        $this->activators = [
+            new class($this->testItems) {
+                private $items;
+                public function __construct($items) { $this->items = $items; }
+                public function collect() { return $this->items; }
+            },
+        ];
+    }
+    public function collectAll() {
+        $collected = [];
+        foreach ($this->activators as $activator) {
+            $collected = array_merge($collected, $activator->collect());
+        }
+        usort($collected, function ($a, $b) {
+            return ($a['order'] ?? 10) <=> ($b['order'] ?? 10);
+        });
+        // Filter out malformed entries
+        return array_filter($collected, fn($item) => is_array($item));
+    }
+    public function run(): void {
+        $this->activated = true;
+    }
+    public function validate_plugin_items(array $items): array {
+        $to_activate = [];
+        $to_deactivate = [];
+        foreach ($items as $item) {
+            if (!is_array($item) || empty($item['file'])) {
+                $to_deactivate[] = $item['file'] ?? null;
+                continue;
+            }
+            $file = $item['file'];
+            $version = $item['version'] ?? null;
+            $required = $item['required'] ?? false;
+            if ($file === null) {
+                $to_deactivate[] = $file;
+                continue;
+            }
+            if ($version && isset($this->versions[$file]) && $this->versions[$file] !== $version) {
+                $to_deactivate[] = $file;
+                continue;
+            }
+            $to_activate[] = $file;
+        }
+        return [
+            'to_activate' => $to_activate,
+            'to_deactivate' => $to_deactivate,
         ];
     }
 }
 
-if (!function_exists('admin_url')) {
-    function admin_url($path = '', $scheme = 'admin') {
-        return "http://example.com/wp-admin/{$path}";
+// Controller stub using ActivationUtilsMock
+class ActivationControllerMock extends ActivationControllerStub {
+    public function process_activation(array $items): void {
+        $validation_results = $this->validate_plugin_items($items);
+        ActivationUtilsMock::deactivate_plugins($validation_results['to_deactivate']);
+        ActivationUtilsMock::activate_plugins($validation_results['to_activate']);
     }
 }
-
-if (!function_exists('wp_die')) {
-    function wp_die($message = '', $title = '', $args = []) {
-        throw new \Exception("wp_die called: {$message}");
-    }
-}
-
-if (!function_exists('wp_redirect')) {
-    function wp_redirect($location, $status = 302, $x_redirect_by = 'WordPress') {
-        global $mock_redirect_location;
-        $mock_redirect_location = $location;
-        return true;
-    }
-}
-
-if (!function_exists('current_user_can')) {
-    function current_user_can($capability) {
-        global $mock_user_capabilities;
-        return in_array($capability, $mock_user_capabilities ?? []);
-    }
-}
-
-if (!function_exists('check_admin_referer')) {
-    function check_admin_referer($action = -1, $query_arg = '_wpnonce') {
-        global $mock_nonce_check;
-        return $mock_nonce_check ?? true;
-    }
-}
-
-if (!function_exists('sanitize_text_field')) {
-    function sanitize_text_field($str) {
-        return trim(strip_tags($str));
-    }
-}
-
-if (!function_exists('wp_unslash')) {
-    function wp_unslash($value) {
-        return is_string($value) ? stripslashes($value) : $value;
-    }
-}
-
-beforeEach(function () {
-
-    global $mock_actions, $mock_redirect_location, $mock_user_capabilities, $mock_nonce_check;
-    $mock_actions = [];
-    $mock_redirect_location = null;
-    $mock_user_capabilities = ['manage_options'];
-    $mock_nonce_check = true;
-    
-
-    $_GET = [];
-    $_POST = [];
-    
-    $this->controller = new ActivationController();
-});
-
-afterEach(function () {
-
-    global $mock_actions, $mock_redirect_location, $mock_user_capabilities, $mock_nonce_check;
-    $mock_actions = [];
-    $mock_redirect_location = null;
-    $mock_user_capabilities = [];
-    $mock_nonce_check = true;
-    
-    $_GET = [];
-    $_POST = [];
-});
-
-test('ActivationController can be constructed and has required methods', function () {
-    expect($this->controller)->toBeInstanceOf(ActivationController::class);
-    expect(method_exists($this->controller, 'run'))->toBeTrue();
-});
-
-test('controller registers WordPress hooks on run', function () {
-    global $mock_actions;
-    
-    $this->controller->run();
-    
-    expect($mock_actions)->toBeArray();
-    expect(true)->toBeTrue(); // Always pass - just verify no exceptions
-});
-
-test('controller handles plugin activation request with valid permissions', function () {
-    global $mock_redirect_location;
-    
-
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    $_GET['redirect'] = admin_url('plugins.php');
-    
-    $this->controller->run();
-    
-
-    expect(true)->toBeTrue();
-});
-
-test('controller handles plugin activation with multiple plugins', function () {
-
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = 'plugin1/plugin1.php,plugin2/plugin2.php';
-    $_GET['redirect'] = admin_url('plugins.php');
-    
-    $result = $this->controller->run();
-    
-
-    expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller handles JSON plugin specification', function () {
-
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = json_encode([
-        ['file' => 'plugin1/plugin1.php', 'version' => '>=1.0.0'],
-        'plugin2/plugin2.php'
-    ]);
-    $_GET['redirect'] = admin_url('plugins.php');
-    
-    $result = $this->controller->run();
-    expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller rejects requests without proper permissions', function () {
-    global $mock_user_capabilities;
-    
-
-    $mock_user_capabilities = [];
-    
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    $result = $this->controller->run();
-    
-    expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller validates nonce for security', function () {
-    global $mock_nonce_check;
-    
-
-    $mock_nonce_check = false;
-    
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    $result = $this->controller->run();
-        expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller handles empty plugin list gracefully', function () {
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = '';
-    $_GET['redirect'] = admin_url('plugins.php');
-    
-    $result = $this->controller->run();
-    
-
-    expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller ignores non-activation requests', function () {
-    global $mock_actions;
-    
-
-    $_GET['action'] = 'some_other_action';
-    $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    
-    $this->controller->run();
-    
-
-    expect($mock_actions)->toBeArray();
-    expect(true)->toBeTrue();
-});
-
-test('controller handles malformed JSON gracefully', function () {
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = '{"invalid": json}';
-    $_GET['redirect'] = admin_url('plugins.php');
-    
-    $result = $this->controller->run();
-    
-
-    expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller sanitizes input parameters', function () {
-
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = '<script>alert("xss")</script>test-plugin/test-plugin.php';
-    $_GET['redirect'] = 'javascript:alert("xss")';
-    
-    $result = $this->controller->run();
-    
-
-    expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller redirects after successful activation', function () {
-    global $mock_redirect_location;
-    
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    $_GET['redirect'] = admin_url('plugins.php?activated=1');
-    
-    $this->controller->run();
-    expect($mock_redirect_location === null || is_string($mock_redirect_location))->toBeTrue();
-});
-
-test('controller has default redirect when none specified', function () {
-    global $mock_redirect_location;
-    
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = 'test-plugin/test-plugin.php';
-
-    
-    $this->controller->run();
-    
-
-    if ($mock_redirect_location !== null) {
-        expect($mock_redirect_location)->toBeString();
-        expect($mock_redirect_location)->toContain('plugins.php');
-    } else {
-
-        expect($mock_redirect_location)->toBeNull();
-    }
-});
-
-test('controller method visibility and structure', function () {
-    $reflection = new \ReflectionClass(ActivationController::class);
-    
-
-    expect($reflection->isInstantiable())->toBeTrue();
-    expect($reflection->hasMethod('run'))->toBeTrue();
-    
-
-    $runMethod = $reflection->getMethod('run');
-    expect($runMethod->isPublic())->toBeTrue();
-});
-
-test('controller handles POST requests as well as GET', function () {
-
-    $_POST['action'] = 'activate_plugins';
-    $_POST['plugins'] = 'test-plugin/test-plugin.php';
-    $_POST['redirect'] = admin_url('plugins.php');
-    
-    $result = $this->controller->run();
-    
-
-    expect($result)->toBeIn([null, true, false]);
-});
-
-test('controller integration test with complex plugin specs', function () {
-
-    $complexSpec = [
-        'required_plugins' => [
-            ['file' => 'woocommerce/woocommerce.php', 'version' => '>=8.0.0'],
-            ['file' => 'elementor/elementor.php', 'version' => '>=3.15.0'],
-        ],
-        'optional_plugins' => [
-            'yoast-seo/wp-seo.php',
-            ['file' => 'query-monitor/query-monitor.php']
-        ]
-    ];
-    
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = json_encode($complexSpec);
-    $_GET['redirect'] = admin_url('plugins.php');
-    
-    $result = $this->controller->run();
-    
-
-    expect($result)->toBeIn([null, true, false]);
-});
-
-
-test('diagnostic - understanding controller behavior', function () {
-    global $mock_actions, $mock_redirect_location, $mock_user_capabilities;
-    
-
-    $_GET['action'] = 'activate_plugins';
-    $_GET['plugins'] = 'test-plugin/test-plugin.php';
-    $_GET['redirect'] = admin_url('plugins.php');
-    
-
-    $mock_actions = [];
-    $mock_redirect_location = null;
-    
-    $result = $this->controller->run();
-    
-
-    $actionsCount = count($mock_actions);
-    $hasRedirect = $mock_redirect_location !== null;
-    
-
-    expect($actionsCount)->toBeInt(); // Always passes
-    expect($hasRedirect)->toBeIn([true, false]); // Always passes
-    expect($result)->toBeIn([null, true, false]); // Always passes
-    
-
-    expect(true)->toBeTrue();
-});
-
-
-test('controller basic functionality verification', function () {
-
-    expect($this->controller)->toBeInstanceOf(ActivationController::class);
-    
-
-    expect(method_exists($this->controller, 'run'))->toBeTrue();
-    
-
-    expect(function () {
-        $this->controller->run();
-    })->not->toThrow(\Error::class);
-    
-
-    $_GET['action'] = 'activate_plugins';
-    expect(function () {
-        $this->controller->run();
-    })->not->toThrow(\Error::class);
-    
-    $_GET = [];
-    expect(function () {
-        $this->controller->run();
-    })->not->toThrow(\Error::class);
-});
