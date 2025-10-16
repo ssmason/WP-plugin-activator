@@ -179,13 +179,7 @@ final class GroupActivator implements ActivatorInterface
             'data'  => $plugin,
         ];
     }
-    //     return [
-    //         'type'  => $this->get_type(),
-    //         'order' => (int)($plugin['order'] ?? 0),
-    //         'data'  => $plugin,
-    //     ];
-    // }
-
+    
     /**
      * Log invalid plugin configuration.
      *
@@ -199,60 +193,4 @@ final class GroupActivator implements ActivatorInterface
     }
  
     
-    // /**
-    //  * Validate plugin version constraint if specified.
-    //  *
-    //  * @param array $plugin_data Plugin configuration data.
-    //  * @return void
-    //  * @since 1.0.0
-    //  */
-    // private function validate_plugin_version(array $plugin_data): void
-    // {
-    //     $required_version = $plugin_data['version'] ?? null;
-
-    //     if (empty($required_version)) {
-    //         return; // No version constraint to validate.
-    //     }
-
-    //     $current_version = ActivationUtils::get_plugin_version($plugin_data['file']);
-
-    //     if ($current_version === null) {
-    //         return; // Can't validate without current version.
-    //     }
-
-    //     if (!ActivationUtils::satisfies_version($current_version, $required_version)) {
-    //         $this->log_version_mismatch($plugin_data['file'], $required_version, $current_version);
-    //     }
-    // }
-
-    // /**
-    //  * Log version mismatch for debugging.
-    //  *
-    //  * @param string $file Plugin file path.
-    //  * @param string $required_version Required version constraint.
-    //  * @param string $current_version Current installed version.
-    //  * @return void
-    //  * @since 1.0.0
-    //  */
-    // private function log_version_mismatch(string $file, string $required_version, string $current_version): void
-    // {
-    //     error_log(sprintf(
-    //         '[GroupActivator] Version mismatch for %s. Required %s, found %s.',
-    //         $file,
-    //         $required_version,
-    //         $current_version
-    //     ));
-    // }
-
-    // /**
-    //  * Activate the plugin using activation utilities.
-    //  *
-    //  * @param array $plugin_data Plugin configuration data.
-    //  * @return void
-    //  * @since 1.0.0
-    //  */
-    // private function activate_group_plugin(array $plugin_data): void
-    // {
-    //     ActivationUtils::activate_plugins([$plugin_data]);
-    // }
 }
