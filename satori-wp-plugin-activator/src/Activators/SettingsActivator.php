@@ -18,7 +18,6 @@ declare(strict_types=1);
 namespace SatoriDigital\PluginActivator\Activators;
 
 use SatoriDigital\PluginActivator\Interfaces\ActivatorInterface;
-use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
 /**
  * Class SettingsActivator
@@ -32,12 +31,14 @@ use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
  */
 final class SettingsActivator implements ActivatorInterface
 {
+    private const TYPE = 'setting';
+
     /**
      * Array of settings configurations.
      *
-     * @var array<int, array{field:string, operator:string, value:mixed, plugins:array}>
+     * @var array<int, array{field:string, operator?:string, value:mixed, plugins:array, order?:int}>
      */
-    private array $settings;
+    private readonly array $settings;
 
     /**
      * Constructor.
@@ -58,7 +59,7 @@ final class SettingsActivator implements ActivatorInterface
      */
     public function get_type(): string
     {
-        return 'setting';
+        return self::TYPE;
     }
 
     /**
@@ -72,29 +73,63 @@ final class SettingsActivator implements ActivatorInterface
      */
     public function collect(): array
     {
+        if (empty($this->settings)) {
+            return [];
+        }
 
         $items = [];
-        foreach ($this->settings as $s) {
-            if (
-                empty($s['field'])
-                || !array_key_exists('value', $s)
-                || empty($s['plugins'])
-                || !is_array($s['plugins'])
-            ) {
-                error_log('[SettingsActivator] Invalid settings entry (need field, value, plugins[]).');
+
+        foreach ($this->settings as $setting) {
+            if (!$this->is_valid_setting($setting)) {
+                $this->log_invalid_setting($setting);
                 continue;
             }
 
-            if ( ! $this->handle($s)) {
+            if (!$this->handle($setting)) {
                 continue;
             }
+
             $items[] = [
-                'type'  => $this->get_type(),
-                'order' => (int)($s['order'] ?? 0),
-                'data'  => $s,
+                'type'  => self::TYPE,
+                'order' => (int)($setting['order'] ?? 0),
+                'data'  => $setting,
             ];
         }
+
         return $items;
+    }
+
+    /**
+     * Validate a settings entry.
+     *
+     * Ensures the configuration has the required fields and structure.
+     *
+     * @param array $setting Settings configuration.
+     * @return bool True if valid, false otherwise.
+     * @since 1.0.0
+     */
+    private function is_valid_setting(array $setting): bool
+    {
+        return !empty($setting['field'])
+            && array_key_exists('value', $setting)
+            && !empty($setting['plugins'])
+            && is_array($setting['plugins']);
+    }
+
+    /**
+     * Log invalid settings entry.
+     *
+     * @param array $setting The invalid configuration.
+     * @return void
+     * @since 1.0.0
+     */
+    private function log_invalid_setting(array $setting): void
+    {
+        $field = $setting['field'] ?? '(undefined)';
+        error_log(sprintf(
+            '[SettingsActivator] Invalid settings entry (need field, value, plugins[]). Field: "%s".',
+            $field
+        ));
     }
 
     /**
@@ -107,14 +142,14 @@ final class SettingsActivator implements ActivatorInterface
      * @return bool True if condition is satisfied and plugins should be activated.
      * @since 1.0.0
      */
-    public function handle(array $item): bool 
+    public function handle(array $item): bool
     {
         if (!isset($item['field']) || !isset($item['plugins'])) {
             return false;
         }
-        error_log('[SettingsActivator] Handling settings item: ' . json_encode($item)); 
+
         $condition_config = $this->extract_condition_config($item);
-        return  $this->evaluate_condition($condition_config);
+        return $this->evaluate_condition($condition_config);
     }
 
     /**
@@ -125,13 +160,25 @@ final class SettingsActivator implements ActivatorInterface
      * @since 1.0.0
      */
     private function extract_condition_config(array $item): array
-    { 
+    {
+        [
+            'field'    => $field,
+            'operator' => $operator,
+            'value'    => $expected,
+            'plugins'  => $plugins,
+        ] = $item + [
+            'field'    => '',
+            'operator' => 'equals',
+            'value'    => null,
+            'plugins'  => [],
+        ];
+
         return [
-            'field'    => $item['field'] ?? '',
-            'operator' => $item['operator'] ?? 'equals',
-            'expected' => $item['value'] ?? null,
-            'plugins'  => $item['plugins'] ?? [],
-            'actual'   => isset($item['field']) ? get_option($item['field']) : null,
+            'field'    => $field,
+            'operator' => $operator,
+            'expected' => $expected,
+            'plugins'  => $plugins,
+            'actual'   => get_option($field),
         ];
     }
 
@@ -144,82 +191,88 @@ final class SettingsActivator implements ActivatorInterface
      */
     private function evaluate_condition(array $config): bool
     {
- 
         $operator = $config['operator'];
-        $actual = $config['actual'];
+        $actual   = $config['actual'];
         $expected = $config['expected'];
- 
-        
+
         return match ($operator) {
             'equals'     => $this->compare_equals($actual, $expected),
             'not_equals' => $this->compare_not_equals($actual, $expected),
             'contains'   => $this->compare_contains($actual, $expected),
             'in'         => $this->compare_in($actual, $expected),
-            default      => $this->compare_equals($actual, $expected),
+            default      => $this->handle_unknown_operator($operator, $actual, $expected),
         };
+    }
+
+    /**
+     * Handle unknown comparison operators.
+     *
+     * Logs a warning and defaults to strict equality comparison.
+     *
+     * @param string $operator Operator name.
+     * @param mixed  $actual   Actual value.
+     * @param mixed  $expected Expected value.
+     * @return bool Comparison result (defaults to equality).
+     * @since 1.0.0
+     */
+    private function handle_unknown_operator(string $operator, mixed $actual, mixed $expected): bool
+    {
+        error_log(sprintf('[SettingsActivator] Unknown operator "%s". Defaulting to "equals".', $operator));
+        return $this->compare_equals($actual, $expected);
     }
 
     /**
      * Compare values for equality.
      *
-     * @param mixed $actual Actual option value.
+     * @param mixed $actual   Actual option value.
      * @param mixed $expected Expected value.
      * @return bool True if values are equal.
      * @since 1.0.0
      */
-    private function compare_equals($actual, $expected): bool
+    private function compare_equals(mixed $actual, mixed $expected): bool
     {
-        if ($actual === false) {
-            return false;
-        }
-        return (string)$actual === (string)$expected;
+        return $actual !== false && (string)$actual === (string)$expected;
     }
 
     /**
      * Compare values for inequality.
      *
-     * @param mixed $actual Actual option value.
+     * @param mixed $actual   Actual option value.
      * @param mixed $expected Expected value.
      * @return bool True if values are not equal.
      * @since 1.0.0
      */
-    private function compare_not_equals($actual, $expected): bool
+    private function compare_not_equals(mixed $actual, mixed $expected): bool
     {
         return (string)$actual !== (string)$expected;
     }
 
     /**
-     * Check if actual value contains expected string.
+     * Check if actual value contains expected substring.
      *
-     * @param mixed $actual Actual option value.
+     * @param mixed $actual   Actual option value.
      * @param mixed $expected Expected substring.
      * @return bool True if actual contains expected.
      * @since 1.0.0
      */
-    private function compare_contains($actual, $expected): bool
+    private function compare_contains(mixed $actual, mixed $expected): bool
     {
-        if (!is_string($actual) || !is_string($expected)) {
-            return false;
-        }
-
-        return strpos($actual, $expected) !== false;
+        return is_string($actual)
+            && is_string($expected)
+            && str_contains($actual, $expected);
     }
 
     /**
      * Check if actual value is in expected array.
      *
-     * @param mixed $actual Actual option value.
+     * @param mixed $actual   Actual option value.
      * @param mixed $expected Expected array of values.
      * @return bool True if actual is in expected array.
      * @since 1.0.0
      */
-    private function compare_in($actual, $expected): bool
+    private function compare_in(mixed $actual, mixed $expected): bool
     {
-        if (!is_array($expected)) {
-            return false;
-        }
-
-        return in_array($actual, $expected, true);
+        return is_array($expected)
+            && in_array($actual, $expected, true);
     }
-
 }

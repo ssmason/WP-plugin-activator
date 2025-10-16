@@ -18,7 +18,6 @@ declare(strict_types=1);
 namespace SatoriDigital\PluginActivator\Activators;
 
 use SatoriDigital\PluginActivator\Interfaces\ActivatorInterface;
-use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
 /**
  * Class GroupActivator
@@ -32,12 +31,14 @@ use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
  */
 final class GroupActivator implements ActivatorInterface
 {
+    private const TYPE = 'group';
+
     /**
      * Array of group configurations keyed by environment name.
      *
      * @var array<string, array{url:string, plugins:array}>
      */
-    private array $groups;
+    private readonly array $groups;
 
     /**
      * Constructor.
@@ -58,7 +59,7 @@ final class GroupActivator implements ActivatorInterface
      */
     public function get_type(): string
     {
-        return 'group';
+        return self::TYPE;
     }
 
     /**
@@ -77,8 +78,7 @@ final class GroupActivator implements ActivatorInterface
         }
 
         $matching_group = $this->find_matching_environment_group();
-
-        if (!$matching_group) {
+        if ($matching_group === null) {
             return [];
         }
 
@@ -88,7 +88,7 @@ final class GroupActivator implements ActivatorInterface
     /**
      * Find the group that matches the current environment URL.
      *
-     * @return array|null Matching group configuration or null if no match.
+     * @return array{name:string, config:array}|null Matching group configuration or null if no match.
      * @since 1.0.0
      */
     private function find_matching_environment_group(): ?array
@@ -98,7 +98,7 @@ final class GroupActivator implements ActivatorInterface
         foreach ($this->groups as $group_name => $group_config) {
             if ($this->does_group_match_current_url($group_config, $current_url)) {
                 return [
-                    'name' => $group_name,
+                    'name'   => $group_name,
                     'config' => $group_config,
                 ];
             }
@@ -122,35 +122,34 @@ final class GroupActivator implements ActivatorInterface
      * Check if group configuration matches current URL.
      *
      * @param array  $group_config Group configuration.
-     * @param string $current_url Current site URL.
+     * @param string $current_url  Current site URL.
      * @return bool True if group matches current environment.
      * @since 1.0.0
      */
     private function does_group_match_current_url(array $group_config, string $current_url): bool
     {
         $group_url = !empty($group_config['url']) ? rtrim($group_config['url'], '/') : null;
-
-        return $group_url && $group_url === $current_url;
+        return $group_url !== null && hash_equals($group_url, $current_url);
     }
 
     /**
      * Collect all valid plugin items from the matching group.
      *
-     * @param array $matching_group Matching group data.
-     * @return array Array of formatted plugin items.
+     * @param array{name:string, config:array} $matching_group Matching group data.
+     * @return array<int, array{type:string, order:int, data:array}> Array of formatted plugin items.
      * @since 1.0.0
      */
     private function collect_plugins_from_group(array $matching_group): array
     {
-        $group_name = $matching_group['name'];
+        $group_name   = $matching_group['name'];
         $group_config = $matching_group['config'];
-        $plugins = $group_config['plugins'] ?? [];
+        $plugins      = $group_config['plugins'] ?? [];
 
         $items = [];
+
         foreach ($plugins as $plugin) {
             $formatted_item = $this->format_plugin_item($plugin, $group_name);
-
-            if ($formatted_item) {
+            if ($formatted_item !== null) {
                 $items[] = $formatted_item;
             }
         }
@@ -159,11 +158,11 @@ final class GroupActivator implements ActivatorInterface
     }
 
     /**
-     * Format a single plugin configuration into collection item.
+     * Format a single plugin configuration into a collection item.
      *
-     * @param array  $plugin Plugin configuration.
+     * @param array  $plugin     Plugin configuration.
      * @param string $group_name Group name for error logging.
-     * @return array|null Formatted item or null if invalid.
+     * @return array{type:string, order:int, data:array}|null Formatted item or null if invalid.
      * @since 1.0.0
      */
     private function format_plugin_item(array $plugin, string $group_name): ?array
@@ -173,13 +172,18 @@ final class GroupActivator implements ActivatorInterface
             return null;
         }
 
+        if (!str_ends_with($plugin['file'], '.php')) {
+            error_log(sprintf('[GroupActivator] %s: invalid plugin file "%s".', $group_name, $plugin['file']));
+            return null;
+        }
+
         return [
-            'type'  => $this->get_type(),
+            'type'  => self::TYPE,
             'order' => (int)($plugin['order'] ?? 0),
             'data'  => $plugin,
         ];
     }
-    
+
     /**
      * Log invalid plugin configuration.
      *
@@ -191,6 +195,4 @@ final class GroupActivator implements ActivatorInterface
     {
         error_log(sprintf('[GroupActivator] %s: skipping plugin with missing "file".', $group_name));
     }
- 
-    
 }

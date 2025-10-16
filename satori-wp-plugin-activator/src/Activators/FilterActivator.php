@@ -18,7 +18,6 @@ declare(strict_types=1);
 namespace SatoriDigital\PluginActivator\Activators;
 
 use SatoriDigital\PluginActivator\Interfaces\ActivatorInterface;
-use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
 /**
  * Class FilterActivator
@@ -32,12 +31,14 @@ use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
  */
 final class FilterActivator implements ActivatorInterface
 {
+    private const TYPE = 'filter';
+
     /**
      * Array of filter configurations.
      *
-     * @var array<int, array{hook:string, priority:int, plugins:array}>
+     * @var array<int, array{hook:string, priority?:int, plugins:array, order?:int}>
      */
-    private array $filters;
+    private readonly array $filters;
 
     /**
      * Constructor.
@@ -58,7 +59,7 @@ final class FilterActivator implements ActivatorInterface
      */
     public function get_type(): string
     {
-        return 'filter';
+        return self::TYPE;
     }
 
     /**
@@ -72,22 +73,65 @@ final class FilterActivator implements ActivatorInterface
      */
     public function collect(): array
     {
+        if (empty($this->filters)) {
+            return [];
+        }
+
         $items = [];
 
-        foreach ($this->filters as $f) {
-            if (empty($f['hook']) || empty($f['plugins']) || !is_array($f['plugins'])) {
-                error_log('[FilterActivator] Invalid filter entry (missing hook/plugins).');
+        foreach ($this->filters as $filter) {
+            if (!is_array($filter)) {
+                error_log(sprintf(
+                    '[FilterActivator] Invalid filter entry type: expected array, got %s',
+                    gettype($filter)
+                ));
+                continue;
+            }
+
+            if (!$this->is_valid_filter($filter)) {
+                $this->log_invalid_filter($filter);
                 continue;
             }
 
             $items[] = [
-                'type'  => $this->get_type(),
-                'order' => (int)($f['order'] ?? 0),
-                'data'  => $f,
+                'type'  => self::TYPE,
+                'order' => (int)($filter['order'] ?? 0),
+                'data'  => $filter,
             ];
         }
 
         return $items;
     }
- 
+
+    /**
+     * Validate a single filter configuration entry.
+     *
+     * Ensures required keys exist and that the plugins field is properly structured.
+     *
+     * @param array $filter Filter configuration.
+     * @return bool True if valid, false otherwise.
+     * @since 1.0.0
+     */
+    private function is_valid_filter(array $filter): bool
+    {
+        return !empty($filter['hook'])
+            && !empty($filter['plugins'])
+            && is_array($filter['plugins']);
+    }
+
+    /**
+     * Log invalid filter configuration.
+     *
+     * @param array $filter Filter configuration for context.
+     * @return void
+     * @since 1.0.0
+     */
+    private function log_invalid_filter(array $filter): void
+    {
+        $hook = $filter['hook'] ?? '(undefined)';
+        error_log(sprintf(
+            '[FilterActivator] Invalid filter entry (missing hook/plugins). Hook: "%s"',
+            $hook
+        ));
+    }
 }

@@ -18,7 +18,6 @@ declare(strict_types=1);
 namespace SatoriDigital\PluginActivator\Activators;
 
 use SatoriDigital\PluginActivator\Interfaces\ActivatorInterface;
-use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 
 /**
  * Class PluginActivator
@@ -32,12 +31,14 @@ use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
  */
 final class PluginActivator implements ActivatorInterface
 {
+    private const TYPE = 'plugin';
+
     /**
      * Array of plugin specifications.
      *
-     * @var array<int, array{file:string, required?:bool, version?:string, order?:int}>
+     * @var array<int, string|array{file:string, required?:bool, version?:string, order?:int}>
      */
-    private array $plugins;
+    private readonly array $plugins;
 
     /**
      * Constructor.
@@ -58,34 +59,69 @@ final class PluginActivator implements ActivatorInterface
      */
     public function get_type(): string
     {
-        return 'plugin';
+        return self::TYPE;
     }
 
     /**
      * Collect plugin items for global ordering.
      *
-     * Processes plugin configurations and returns an array of items that can be
-     * sorted globally by order/priority before activation.
-     *
-     * @return array<int, array{type:string, order:int, data:array}> Array of plugin items.
+     * @return array<int, array{type:string, order:int, data:array}>
      * @since 1.0.0
      */
     public function collect(): array
     {
+        if (empty($this->plugins)) {
+            return [];
+        }
+
         $items = [];
-        foreach ($this->plugins as $p) {
-            if (empty($p['file'])) {
-                error_log('[PluginActivator] Skipping plugin with missing "file".');
+
+        foreach ($this->plugins as $plugin) {
+            // Normalize string entries into array form
+            $plugin = is_string($plugin) ? ['file' => $plugin] : $plugin;
+
+            if (!$this->is_valid_plugin($plugin)) {
+                $this->log_invalid_plugin($plugin);
                 continue;
             }
 
             $items[] = [
-                'type'  => $this->get_type(),
-                'order' => (int)($p['order'] ?? 0),
-                'data'  => $p,
+                'type'  => self::TYPE,
+                'order' => (int)($plugin['order'] ?? 0),
+                'data'  => $plugin,
             ];
         }
 
         return $items;
-    } 
+    }
+
+    /**
+     * Validate a plugin configuration.
+     *
+     * @param array $plugin Plugin configuration array.
+     * @return bool True if valid, false otherwise.
+     * @since 1.0.0
+     */
+    private function is_valid_plugin(array $plugin): bool
+    {
+        return !empty($plugin['file'])
+            && is_string($plugin['file'])
+            && str_ends_with($plugin['file'], '.php');
+    }
+
+    /**
+     * Log invalid plugin configuration.
+     *
+     * @param array $plugin Plugin configuration array.
+     * @return void
+     * @since 1.0.0
+     */
+    private function log_invalid_plugin(array $plugin): void
+    {
+        $file = $plugin['file'] ?? '(undefined)';
+        error_log(sprintf(
+            '[PluginActivator] Skipping invalid plugin entry (missing or invalid file): "%s".',
+            $file
+        ));
+    }
 }
