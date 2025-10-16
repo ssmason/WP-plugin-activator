@@ -77,7 +77,7 @@ final class PluginActivator implements ActivatorInterface
         $items = [];
 
         foreach ($this->plugins as $plugin) {
-            // Normalize string entries into array form
+            // Normalize string entries into array form.
             $plugin = is_string($plugin) ? ['file' => $plugin] : $plugin;
 
             if (!$this->is_valid_plugin($plugin)) {

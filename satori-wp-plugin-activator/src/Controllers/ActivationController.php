@@ -2,7 +2,7 @@
 /**
  * Activation Controller
  *
- * Main controller that orchestrates plugin activation across all activator types.
+ * Orchestrates plugin activation across all activator types.
  * Collects activation instructions from multiple sources, sorts globally by order,
  * and applies them in a coordinated manner with proper validation.
  *
@@ -27,9 +27,8 @@ use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 /**
  * Class ActivationController
  *
- * Main activation controller that collects all activation instructions from
- * multiple activator types, sorts them globally by order priority, and
- * applies them in a coordinated manner with comprehensive validation.
+ * Collects, validates, and executes plugin activation actions from
+ * multiple activator types in globally sorted order.
  *
  * @package SatoriDigital\PluginActivator\Controllers
  * @since   1.0.0
@@ -37,32 +36,32 @@ use SatoriDigital\PluginActivator\Helpers\ActivationUtils;
 class ActivationController
 {
     /**
-     * Configuration array loaded from JSON files.
+     * Loaded configuration array.
      *
      * @var array
      * @since 1.0.0
      */
-    protected array $config;
+    protected array $config = [];
 
     /**
-     * Array of activator instances.
+     * List of activator instances.
      *
-     * @var array
+     * @var array<int, object>
      * @since 1.0.0
      */
     protected array $activators = [];
 
     /**
-     * Controller constructor.
+     * Constructor.
      *
-     * Loads configuration into $this->config and initializes activators.
+     * Loads configuration and initializes all activators.
      *
      * @since 1.0.0
      */
     public function __construct()
     {
-        $loader        = new ConfigLoader();
-        $this->config  = $loader->load();
+        $loader       = new ConfigLoader();
+        $this->config = $loader->load();
 
         $this->activators = [
             new PluginActivator($this->config),
@@ -75,8 +74,8 @@ class ActivationController
     /**
      * Run the complete activation workflow.
      *
-     * Collects items from all activators, sorts globally by order,
-     * then processes activation with proper validation and logging.
+     * Collects activation items from all activators, sorts by priority,
+     * and delegates activation and validation to ActivationUtils.
      *
      * @return void
      * @since 1.0.0
@@ -86,29 +85,27 @@ class ActivationController
         $collected = [];
 
         foreach ($this->activators as $activator) {
-            $collected = array_merge($collected, $activator->collect());
+            $items = $activator->collect();
+            if (!empty($items)) {
+                $collected = array_merge($collected, $items);
+            }
         }
 
-        // Sort globally by order.
-        usort($collected, function ($a, $b) {
+        if (empty($collected)) {
+            return;
+        }
+
+        usort($collected, static function (array $a, array $b): int {
             return ($a['order'] ?? 10) <=> ($b['order'] ?? 10);
         });
 
-        // Deactivate unlisted plugins.
         ActivationUtils::deactivate_unlisted_plugins($collected);
-
-        // Check version constraints.
         ActivationUtils::check_versions($collected);
-
-        // Activate plugins in priority order.
         ActivationUtils::activate_plugins($collected);
     }
 
     /**
-     * Process activation, deactivation, and version checks for collected items.
-     *
-     * Validates plugin files, checks version constraints, and determines
-     * which plugins should be activated or deactivated based on requirements.
+     * Process activation and deactivation for collected items.
      *
      * @param array $items Array of plugin items to process.
      * @return void
@@ -116,36 +113,49 @@ class ActivationController
      */
     protected function process_activation(array $items): void
     {
-        $validation_results = $this->validate_plugin_items($items);
+        if (empty($items)) {
+            return;
+        }
 
-        $this->execute_deactivations($validation_results['to_deactivate']);
-        $this->execute_activations($validation_results['to_activate']);
+        $validation = $this->validate_plugin_items($items);
+
+        if (!empty($validation['to_deactivate'])) {
+            $this->execute_deactivations($validation['to_deactivate']);
+        }
+
+        if (!empty($validation['to_activate'])) {
+            $this->execute_activations($validation['to_activate']);
+        }
     }
 
     /**
-     * Validate plugin items and categorize for activation/deactivation.
+     * Validate plugin items and categorize them for activation or deactivation.
      *
      * @param array $items Plugin items to validate.
-     * @return array Arrays of plugins to activate and deactivate.
+     * @return array{to_activate:array,to_deactivate:array}
      * @since 1.0.0
      */
     private function validate_plugin_items(array $items): array
     {
-        $to_activate = [];
+        $to_activate   = [];
         $to_deactivate = [];
 
         foreach ($items as $item) {
-            $validation = $this->validate_single_item($item);
+            if (!is_array($item)) {
+                continue;
+            }
 
-            if ($validation['should_activate']) {
-                $to_activate[] = $validation['file'];
-            } elseif ($validation['should_deactivate']) {
-                $to_deactivate[] = $validation['file'];
+            $result = $this->validate_single_item($item);
+
+            if (($result['should_activate'] ?? false) && !empty($result['file'])) {
+                $to_activate[] = $result['file'];
+            } elseif (($result['should_deactivate'] ?? false) && !empty($result['file'])) {
+                $to_deactivate[] = $result['file'];
             }
         }
 
         return [
-            'to_activate' => $to_activate,
+            'to_activate'   => $to_activate,
             'to_deactivate' => $to_deactivate,
         ];
     }
@@ -154,36 +164,34 @@ class ActivationController
      * Validate a single plugin item.
      *
      * @param array $item Plugin item to validate.
-     * @return array Validation result with actions to take.
+     * @return array{file:?string,should_activate:bool,should_deactivate:bool}
      * @since 1.0.0
      */
     private function validate_single_item(array $item): array
     {
-        $file = $item['file'] ?? null;
-        $version = $item['version'] ?? null;
-        $required = $item['required'] ?? false;
+        $file     = $item['file'] ?? null;
+        $version  = $item['version'] ?? null;
+        $required = (bool)($item['required'] ?? false);
 
-        if (!$file) {
-            return ['should_activate' => false, 'should_deactivate' => false];
+        if (!$file || !is_string($file)) {
+            return ['file' => null, 'should_activate' => false, 'should_deactivate' => false];
         }
 
-        // Check file existence.
         if (ActivationUtils::is_plugin_file_missing($file)) {
             $this->handle_missing_plugin($file, $required);
-            return ['should_activate' => false, 'should_deactivate' => true, 'file' => $file];
+            return ['file' => $file, 'should_activate' => false, 'should_deactivate' => true];
         }
 
-        // Check version constraints.
         if ($version && !ActivationUtils::check_version($file, $version)) {
             ActivationUtils::log_version_mismatch($file, $version);
-            return ['should_activate' => false, 'should_deactivate' => true, 'file' => $file];
+            return ['file' => $file, 'should_activate' => false, 'should_deactivate' => true];
         }
 
-        return ['should_activate' => true, 'should_deactivate' => false, 'file' => $file];
+        return ['file' => $file, 'should_activate' => true, 'should_deactivate' => false];
     }
 
     /**
-     * Handle missing plugin file.
+     * Handle missing plugin file logging for required plugins.
      *
      * @param string $file Plugin file path.
      * @param bool   $required Whether plugin is required.
@@ -200,13 +208,18 @@ class ActivationController
     /**
      * Execute plugin deactivations.
      *
-     * @param array $plugins Array of plugin files to deactivate.
+     * @param array<int,string> $plugins Plugin files to deactivate.
      * @return void
      * @since 1.0.0
      */
     private function execute_deactivations(array $plugins): void
     {
-        if (!empty($plugins)) {
+        if (empty($plugins)) {
+            return;
+        }
+
+        // Defensive check in case ActivationUtils changes signature.
+        if (method_exists(ActivationUtils::class, 'deactivate_plugins')) {
             ActivationUtils::deactivate_plugins($plugins);
         }
     }
@@ -214,14 +227,16 @@ class ActivationController
     /**
      * Execute plugin activations.
      *
-     * @param array $plugins Array of plugin files to activate.
+     * @param array<int,string> $plugins Plugin files to activate.
      * @return void
      * @since 1.0.0
      */
     private function execute_activations(array $plugins): void
     {
-        if (!empty($plugins)) {
-            ActivationUtils::activate_plugins($plugins);
+        if (empty($plugins)) {
+            return;
         }
+
+        ActivationUtils::activate_plugins($plugins);
     }
 }

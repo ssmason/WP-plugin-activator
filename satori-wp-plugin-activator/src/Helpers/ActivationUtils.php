@@ -3,7 +3,7 @@
  * Activation Utils
  *
  * Utility class for plugin activation, version checking, and WordPress integration.
- * Provides static methods for common plugin management tasks including activation,
+ * Provides static methods for plugin management tasks including activation,
  * deactivation, version validation, and file existence checks.
  *
  * @category Plugin_Activator
@@ -29,8 +29,6 @@ use function is_plugin_active;
  *
  * Static utility class providing plugin activation, version checking,
  * and file validation methods for the plugin activator system.
- * Handles complex plugin specifications and provides safe activation
- * with version constraints and dependency management.
  *
  * @package SatoriDigital\PluginActivator\Helpers
  * @since   1.0.0
@@ -45,11 +43,10 @@ final class ActivationUtils
      */
     private static ?array $plugin_cache = null;
 
+    private const LOG_PREFIX = '[PluginActivator]';
+
     /**
      * Ensure WordPress plugin API is loaded.
-     *
-     * Loads the WordPress plugin administration functions if they are not
-     * already available. Required for activate_plugin(), get_plugins(), etc.
      *
      * @return void
      * @since 1.0.0
@@ -80,8 +77,6 @@ final class ActivationUtils
     /**
      * Clear the plugin cache.
      *
-     * Useful for testing or when plugins change during execution.
-     *
      * @return void
      * @since 1.0.0
      */
@@ -91,19 +86,15 @@ final class ActivationUtils
     }
 
     /**
-     * Normalize any input into a flat list of plugin specifications.
-     *
-     * Takes various input formats (strings, specs, collected items) and
-     * converts them into a standardized array of plugin specifications.
-     * Handles deduplication and extracts nested plugin configurations.
+     * Normalize any input into a flat list of plugin specs.
      *
      * @param array $input Array of mixed plugin specifications.
-     * @return array<int, array{file:string, required:bool, version:string|null, defer:bool}> Normalized plugin specs.
+     * @return array<int, array{file:string, required:bool, version:string|null, defer:bool}>
      * @since 1.0.0
      */
     private static function normalize_to_specs(array $input): array
     {
-        $specs = []; // Use file as key for automatic deduplication.
+        $specs = [];
 
         foreach ($input as $item) {
             if (\is_string($item)) {
@@ -120,7 +111,6 @@ final class ActivationUtils
                 continue;
             }
 
-            // Handle nested data structures.
             self::process_nested_plugins($specs, $item);
         }
 
@@ -128,44 +118,40 @@ final class ActivationUtils
     }
 
     /**
-     * Add a normalized plugin spec to the collection.
+     * Add a normalized plugin spec.
      *
-     * @param array $specs Reference to specs collection.
-     * @param array $maybe Raw plugin specification.
+     * @param array $specs Reference.
+     * @param array $maybe Candidate spec.
      * @return void
      * @since 1.0.0
      */
     private static function add_spec(array &$specs, array $maybe): void
     {
-        if (empty($maybe['file'])) {
+        $file = $maybe['file'] ?? '';
+        if ($file === '') {
             return;
         }
 
-        $file = $maybe['file'];
-
-        // Use file as key for automatic deduplication.
         $specs[$file] = [
             'file'     => $file,
-            'required' => $maybe['required'] ?? false,
+            'required' => (bool)($maybe['required'] ?? false),
             'version'  => $maybe['version'] ?? null,
-            'defer'    => $maybe['defer'] ?? false,
+            'defer'    => (bool)($maybe['defer'] ?? false),
         ];
     }
 
     /**
-     * Process nested plugin structures from data or plugins arrays.
+     * Process nested plugin structures.
      *
-     * @param array $specs Reference to specs collection.
-     * @param array $item Item containing nested plugin data.
+     * @param array $specs Reference.
+     * @param array $item Item data.
      * @return void
      * @since 1.0.0
      */
     private static function process_nested_plugins(array &$specs, array $item): void
     {
-        // Check item['data']['plugins'] or item['data']['file'].
-        if (!empty($item['data']) && \is_array($item['data'])) {
-            $data = $item['data'];
-
+        $data = $item['data'] ?? [];
+        if (\is_array($data)) {
             if (!empty($data['file'])) {
                 self::add_spec($specs, $data);
             } elseif (!empty($data['plugins']) && \is_array($data['plugins'])) {
@@ -173,17 +159,16 @@ final class ActivationUtils
             }
         }
 
-        // Check item['plugins'].
         if (!empty($item['plugins']) && \is_array($item['plugins'])) {
             self::process_plugin_array($specs, $item['plugins']);
         }
     }
 
     /**
-     * Process an array of plugin specifications.
+     * Process a plugin array.
      *
-     * @param array $specs Reference to specs collection.
-     * @param array $plugins Array of plugin specifications.
+     * @param array $specs Reference.
+     * @param array $plugins Plugin list.
      * @return void
      * @since 1.0.0
      */
@@ -199,32 +184,28 @@ final class ActivationUtils
     }
 
     /**
-     * Extract plugin file paths from any mixed input.
+     * Extract plugin file paths.
      *
-     * Processes various input formats and returns a clean array of
-     * unique plugin file paths, filtering out duplicates and empty values.
-     *
-     * @param array $input Array of mixed plugin specifications.
-     * @return array<int, string> Array of unique plugin file paths.
+     * @param array $input Mixed specs.
+     * @return array<int, string>
      * @since 1.0.0
      */
     private static function extract_files(array $input): array
     {
-        $files = [];
-        $specs = self::normalize_to_specs($input);
-
-        foreach ($specs as $s) {
-            $files[] = $s['file'];
-        }
-
-        return \array_values(\array_unique(\array_filter($files)));
+        return \array_values(
+            \array_unique(
+                \array_filter(
+                    \array_map(static fn($s) => $s['file'] ?? '', self::normalize_to_specs($input))
+                )
+            )
+        );
     }
 
     /**
-     * Check if a plugin file exists in the WordPress plugins directory.
+     * Check plugin file existence.
      *
-     * @param string $file Plugin file path relative to WP_PLUGIN_DIR.
-     * @return bool True if the plugin file exists, false otherwise.
+     * @param string $file Plugin file.
+     * @return bool
      * @since 1.0.0
      */
     public static function plugin_file_exists(string $file): bool
@@ -233,36 +214,25 @@ final class ActivationUtils
     }
 
     /**
-     * Get the version of an installed plugin.
+     * Get plugin version.
      *
-     * Retrieves the version number from the plugin headers. Returns null
-     * if the plugin is not found or has no version information.
-     *
-     * @param string $file Plugin file path relative to WP_PLUGIN_DIR.
-     * @return string|null The plugin version or null if not found.
+     * @param string $file Plugin file.
+     * @return string|null
      * @since 1.0.0
      */
     public static function get_plugin_version(string $file): ?string
     {
-        $all = self::get_all_plugins(); // ← Uses cache instead of direct get_plugins()
-        if (!isset($all[$file]['Version'])) {
-            return null;
-        }
-
-        $ver = (string) $all[$file]['Version'];
-        return $ver !== '' ? $ver : null;
+        $all = self::get_all_plugins();
+        $ver = $all[$file]['Version'] ?? '';
+        return $ver !== '' ? (string)$ver : null;
     }
 
     /**
-     * Check if a plugin version satisfies a version constraint.
+     * Compare versions with an expression.
      *
-     * Compares the current plugin version against a version expression
-     * such as '>=2.1.0', '<1.0', '=3.0', etc. Uses semantic version
-     * comparison with fallback to simple string comparison.
-     *
-     * @param string      $current      The current plugin version.
-     * @param string|null $required_expr The version constraint expression.
-     * @return bool True if the version satisfies the constraint, false otherwise.
+     * @param string      $current Current version.
+     * @param string|null $required_expr Expression.
+     * @return bool
      * @since 1.0.0
      */
     public static function satisfies_version(string $current, ?string $required_expr): bool
@@ -271,47 +241,37 @@ final class ActivationUtils
             return true;
         }
 
-        if (!\preg_match('/^(>=|<=|>|<|=|==|!=)?\s*([0-9][0-9\.]*)$/', $required_expr, $m)) {
+        if (!\preg_match('/^(>=|<=|>|<|=|==|!=)?\s*([\d\.]+)$/', $required_expr, $m)) {
             return \version_compare($current, $required_expr, '>=');
         }
 
-        $op  = $m[1] ?: '>=';
-        $ver = $m[2];
-        return \version_compare($current, $ver, $op);
+        return \version_compare($current, $m[2], $m[1] ?: '>=');
     }
 
     /**
-     * Check plugin versions against requirements without activation.
+     * Check plugin versions and log mismatches.
      *
-     * Validates all plugins in the input against their version requirements
-     * and logs any mismatches. Does not perform activation, only validation.
-     *
-     * @param array $input Array of plugin specifications with version requirements.
+     * @param array $input Plugin specs.
      * @return void
      * @since 1.0.0
      */
     public static function check_versions(array $input): void
     {
         $specs = self::normalize_to_specs($input);
-        // Get all plugin data once for the entire batch.
         $all_plugins = self::get_all_plugins();
+
         foreach ($specs as $s) {
             $file = $s['file'];
             $req  = $s['version'] ?? null;
-            if (!$req) {
+            if (!$req || empty($all_plugins[$file]['Version'])) {
                 continue;
             }
 
-            // Use cached plugin data instead of calling get_plugin_version().
-            $current = null;
-            if (isset($all_plugins[$file]['Version'])) {
-                $ver = (string) $all_plugins[$file]['Version'];
-                $current = $ver !== '' ? $ver : null;
-            }
-
-            if ($current !== null && !self::satisfies_version($current, $req)) {
+            $current = (string)$all_plugins[$file]['Version'];
+            if (!self::satisfies_version($current, $req)) {
                 error_log(sprintf(
-                    '[PluginActivator] Version mismatch: %s requires %s, found %s.',
+                    '%s Version mismatch: %s requires %s, found %s.',
+                    self::LOG_PREFIX,
                     $file,
                     $req,
                     $current
@@ -321,14 +281,9 @@ final class ActivationUtils
     }
 
     /**
-     * Activate plugins with strict version enforcement.
+     * Activate plugins (immediate + deferred).
      *
-     * Performs plugin activation with comprehensive validation including
-     * file existence, version constraints, and dependency ordering.
-     * Supports deferred activation and automatic deactivation of
-     * version-incompatible plugins.
-     *
-     * @param array $input Array of plugin specifications to activate.
+     * @param array $input Plugin specs.
      * @return void
      * @since 1.0.0
      */
@@ -337,20 +292,17 @@ final class ActivationUtils
         self::ensure_wp_plugin_api();
 
         $specs = self::normalize_to_specs($input);
-        $validation_results = self::validate_plugin_batch($specs);
+        $validated = self::validate_plugin_batch($specs);
 
-        self::process_immediate_activations($validation_results['immediate']);
-        self::process_deferred_activations($validation_results['deferred']);
+        self::process_activations($validated['immediate']);
+        self::process_activations($validated['deferred']);
     }
 
     /**
-     * Validate a batch of plugin specifications.
+     * Validate batch.
      *
-     * Checks file existence and version constraints for all plugins,
-     * separating them into immediate and deferred activation queues.
-     *
-     * @param array $specs Normalized plugin specifications.
-     * @return array Array with 'immediate' and 'deferred' plugin file lists.
+     * @param array $specs Specs.
+     * @return array{immediate:array,deferred:array}
      * @since 1.0.0
      */
     private static function validate_plugin_batch(array $specs): array
@@ -360,127 +312,67 @@ final class ActivationUtils
         $deferred = [];
 
         foreach ($specs as $spec) {
-            $validation = self::validate_single_plugin_spec($spec, $all_plugins);
-
-            if (!$validation['valid']) {
+            if (!self::plugin_file_exists($spec['file'])) {
+                self::handle_missing_plugin_file($spec['file'], (bool)($spec['required'] ?? false));
                 continue;
             }
 
-            if ($spec['defer']) {
+            $version_expr = $spec['version'] ?? null;
+            if ($version_expr && !self::validate_plugin_version_constraint($spec['file'], $version_expr, $all_plugins)) {
+                self::handle_version_constraint_failure($spec['file']);
+                continue;
+            }
+
+            if (!empty($spec['defer'])) {
                 $deferred[] = $spec['file'];
             } else {
                 $immediate[] = $spec['file'];
             }
         }
 
-        return [
-            'immediate' => $immediate,
-            'deferred'  => $deferred,
-        ];
+        return compact('immediate', 'deferred');
     }
 
     /**
-     * Validate a single plugin specification.
-     *
-     * Checks file existence and version constraints for one plugin.
-     * Handles missing files and version mismatches appropriately.
-     *
-     * @param array $spec Plugin specification.
-     * @param array $all_plugins Cached plugin data from WordPress.
-     * @return array Validation result with 'valid' boolean.
-     * @since 1.0.0
-     */
-    private static function validate_single_plugin_spec(array $spec, array $all_plugins): array
-    {
-        $file = $spec['file'];
-        $required = (bool)($spec['required'] ?? false);
-        $version_expr = $spec['version'] ?? null;
-
-        // Check file existence.
-        if (!self::plugin_file_exists($file)) {
-            self::handle_missing_plugin_file($file, $required);
-            return ['valid' => false, 'reason' => 'missing_file'];
-        }
-
-        // Check version constraints.
-        if ($version_expr) {
-            $version_valid = self::validate_plugin_version_constraint($file, $version_expr, $all_plugins);
-            if (!$version_valid) {
-                self::handle_version_constraint_failure($file);
-                return ['valid' => false, 'reason' => 'version_mismatch'];
-            }
-        }
-
-        return ['valid' => true];
-    }
-
-    /**
-     * Validate plugin version against constraint.
-     *
-     * @param string $file Plugin file path.
-     * @param string $version_expr Version constraint expression.
-     * @param array  $all_plugins Cached plugin data.
-     * @return bool True if version constraint is satisfied.
-     * @since 1.0.0
+     * Validate plugin version constraint.
      */
     private static function validate_plugin_version_constraint(
         string $file,
-        string $version_expr,
-        array $all_plugins
+        string $expr,
+        array $all
     ): bool {
-        $current = null;
-        if (isset($all_plugins[$file]['Version'])) {
-            $ver = (string) $all_plugins[$file]['Version'];
-            $current = $ver !== '' ? $ver : null;
-        }
-
-        return $current !== null && self::satisfies_version($current, $version_expr);
+        $ver = $all[$file]['Version'] ?? '';
+        return $ver !== '' && self::satisfies_version($ver, $expr);
     }
 
     /**
-     * Handle missing plugin file.
-     *
-     * @param string $file Plugin file path.
-     * @param bool   $required Whether the plugin is required.
-     * @return void
-     * @since 1.0.0
+     * Missing plugin handler.
      */
     private static function handle_missing_plugin_file(string $file, bool $required): void
     {
-        error_log(sprintf('[PluginActivator] Plugin file not found: %s', $file));
-
+        error_log(sprintf('%s Plugin file not found: %s', self::LOG_PREFIX, $file));
         if ($required) {
             self::log_missing_plugin($file);
         }
     }
 
     /**
-     * Handle version constraint failure.
-     *
-     * Deactivates plugin if currently active due to version mismatch.
-     *
-     * @param string $file Plugin file path.
-     * @return void
-     * @since 1.0.0
+     * Version constraint failure.
      */
     private static function handle_version_constraint_failure(string $file): void
     {
         if (is_plugin_active($file)) {
             deactivate_plugins([$file], false, is_multisite());
-            error_log(sprintf('[PluginActivator] Deactivated due to version mismatch: %s', $file));
+            error_log(sprintf('%s Deactivated due to version mismatch: %s', self::LOG_PREFIX, $file));
         }
     }
 
     /**
-     * Process immediate plugin activations.
-     *
-     * @param array $plugin_files Array of plugin file paths to activate immediately.
-     * @return void
-     * @since 1.0.0
+     * Activate plugin list.
      */
-    private static function process_immediate_activations(array $plugin_files): void
+    private static function process_activations(array $files): void
     {
-        foreach ($plugin_files as $file) {
+        foreach ($files as $file) {
             if (!is_plugin_active($file)) {
                 activate_plugin($file, '', false, true);
             }
@@ -488,29 +380,9 @@ final class ActivationUtils
     }
 
     /**
-     * Process deferred plugin activations.
+     * Deactivate unlisted plugins.
      *
-     * @param array $plugin_files Array of plugin file paths to activate after immediate ones.
-     * @return void
-     * @since 1.0.0
-     */
-    private static function process_deferred_activations(array $plugin_files): void
-    {
-        foreach ($plugin_files as $file) {
-            if (!is_plugin_active($file)) {
-                activate_plugin($file, '', false, true);
-            }
-        }
-    }
-
-    /**
-     * Deactivate plugins not present in the allowed list.
-     *
-     * Compares currently active plugins against the provided input and
-     * deactivates any plugins that are not included in the allowed list.
-     * Useful for maintaining a clean plugin environment.
-     *
-     * @param array $input Array of plugin specifications that should remain active.
+     * @param array $input Plugin specs that should remain active.
      * @return void
      * @since 1.0.0
      */
@@ -518,105 +390,72 @@ final class ActivationUtils
     {
         self::ensure_wp_plugin_api();
 
-        $allowed_files = self::extract_files($input);
-        $active        = (array) get_option('active_plugins', []);
+        $allowed = self::extract_files($input);
+        $active  = (array)get_option('active_plugins', []);
 
-        $to_deactivate = \array_values(\array_diff($active, $allowed_files));
-
-        if (empty($to_deactivate)) {
+        $to_deactivate = \array_diff($active, $allowed);
+        if ($to_deactivate === []) {
             return;
         }
 
         deactivate_plugins($to_deactivate, false, is_multisite());
 
         error_log(sprintf(
-            '[PluginActivator] Deactivated unlisted plugins: %s',
+            '%s Deactivated unlisted plugins: %s',
+            self::LOG_PREFIX,
             \implode(', ', $to_deactivate)
         ));
     }
 
     /**
-     * Check if a plugin version satisfies a constraint.
-     *
-     * Simple version checking method that compares an installed plugin
-     * version against a version constraint string.
-     *
-     * @param string $file       Plugin file path.
-     * @param string $constraint Version constraint (e.g., '>=1.0.0').
-     * @return bool True if constraint is satisfied, false otherwise.
-     * @since 1.0.0
+     * Version check wrapper.
      */
     public static function check_version(string $file, string $constraint): bool
     {
-        $plugins = self::get_all_plugins(); // ← Uses cache instead of direct get_plugins()
-        if (!isset($plugins[$file]['Version'])) {
+        $plugins = self::get_all_plugins();
+        $installed = $plugins[$file]['Version'] ?? '';
+        if ($installed === '') {
             return false;
         }
 
-        $installed = $plugins[$file]['Version'];
-
-        if (preg_match('/^(>=|<=|>|<|==|!=)\s*(.+)$/', $constraint, $matches)) {
-            return version_compare($installed, $matches[2], $matches[1]);
+        if (\preg_match('/^(>=|<=|>|<|==|!=)\s*(.+)$/', $constraint, $m)) {
+            return \version_compare($installed, $m[2], $m[1]);
         }
 
-        return version_compare($installed, $constraint, '>=');
+        return \version_compare($installed, $constraint, '>=');
     }
 
     /**
-     * Check if a plugin file is missing from the filesystem.
-     *
-     * @param string $plugin_file Plugin file path relative to WP_PLUGIN_DIR.
-     * @return bool True if the plugin file is missing, false if it exists.
-     * @since 1.0.0
+     * Missing plugin check.
      */
     public static function is_plugin_file_missing(string $plugin_file): bool
     {
-        return ! self::plugin_file_exists($plugin_file);
+        return !self::plugin_file_exists($plugin_file);
     }
 
     /**
-     * Log version mismatch information to the error log.
-     *
-     * Records detailed information about version conflicts for debugging
-     * and monitoring purposes.
-     *
-     * @param string      $plugin_file   Plugin file path.
-     * @param string      $required_expr Required version expression.
-     * @param string|null $current       Current version (auto-detected if null).
-     * @return void
-     * @since 1.0.0
+     * Log version mismatch.
      */
     public static function log_version_mismatch(
-        string $plugin_file,
-        string $required_expr,
+        string $file,
+        string $required,
         ?string $current = null
     ): void {
-        if ($current === null) {
-            $current = self::get_plugin_version($plugin_file) ?? 'unknown';
-        }
-
-        error_log(
-            sprintf(
-                '[PluginActivator] Version mismatch for %s. Required %s, found %s.',
-                $plugin_file,
-                $required_expr,
-                $current
-            )
-        );
+        $current ??= self::get_plugin_version($file) ?? 'unknown';
+        error_log(sprintf(
+            '%s Version mismatch for %s. Required %s, found %s.',
+            self::LOG_PREFIX,
+            $file,
+            $required,
+            $current
+        ));
     }
 
     /**
-     * Log missing required plugin information to the error log.
-     *
-     * Records when a required plugin is missing from the system,
-     * which may indicate a configuration or installation issue.
-     *
-     * @param string $plugin_file Plugin file path that is missing.
-     * @return void
-     * @since 1.0.0
+     * Log missing required plugin.
      */
-    public static function log_missing_plugin(string $plugin_file): void
+    public static function log_missing_plugin(string $file): void
     {
-        error_log(sprintf('[PluginActivator] REQUIRED plugin missing: %s', $plugin_file));
+        error_log(sprintf('%s REQUIRED plugin missing: %s', self::LOG_PREFIX, $file));
     }
 }

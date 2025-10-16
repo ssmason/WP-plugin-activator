@@ -32,10 +32,9 @@ class ActivatorOptions
     /**
      * Option name used to store the "disable activator" toggle in the database.
      *
-     * @var string
      * @since 1.0.0
      */
-    private string $option_name = 'satori_plugin_activator_disabled';
+    private const OPTION_NAME = 'satori_plugin_activator_disabled';
 
     /**
      * Constructor.
@@ -54,7 +53,6 @@ class ActivatorOptions
     /**
      * Register the "Plugin Activator" settings page under the Settings menu.
      *
-     * @return void
      * @since 1.0.0
      */
     public function register_options_page(): void
@@ -71,7 +69,6 @@ class ActivatorOptions
     /**
      * Register all settings configuration.
      *
-     * @return void
      * @since 1.0.0
      */
     public function register_settings_configuration(): void
@@ -84,17 +81,16 @@ class ActivatorOptions
     /**
      * Register the main setting option.
      *
-     * @return void
      * @since 1.0.0
      */
     private function register_option(): void
     {
         register_setting(
             'satori_plugin_activator_settings',
-            $this->option_name,
+            self::OPTION_NAME,
             [
                 'type'              => 'boolean',
-                'sanitize_callback' => fn($value): bool => (bool) $value,
+                'sanitize_callback' => static fn($value): bool => (bool) $value,
                 'default'           => false,
             ]
         );
@@ -103,7 +99,6 @@ class ActivatorOptions
     /**
      * Register the settings section.
      *
-     * @return void
      * @since 1.0.0
      */
     private function register_section(): void
@@ -119,7 +114,6 @@ class ActivatorOptions
     /**
      * Register the settings field.
      *
-     * @return void
      * @since 1.0.0
      */
     private function register_field(): void
@@ -136,17 +130,16 @@ class ActivatorOptions
     /**
      * Render the toggle input field.
      *
-     * @return void
      * @since 1.0.0
      */
     public function render_toggle_field(): void
     {
-        $value = (bool) get_option($this->option_name, false);
+        $value = (bool) get_option(self::OPTION_NAME, false);
         ?>
         <label class="satori-switch">
             <input
                 type="checkbox"
-                name="<?php echo esc_attr($this->option_name); ?>"
+                name="<?php echo esc_attr(self::OPTION_NAME); ?>"
                 value="1"
                 <?php checked($value); ?>
             />
@@ -159,22 +152,18 @@ class ActivatorOptions
     /**
      * Render the field description.
      *
-     * @return void
      * @since 1.0.0
      */
     private function render_field_description(): void
     {
-        ?>
-        <p class="description">
-            <?php esc_html_e('Turn this on to disable automatic plugin activation.', 'satori-plugin-activator'); ?>
-        </p>
-        <?php
+        echo '<p class="description">';
+        esc_html_e('Turn this on to disable automatic plugin activation.', 'satori-plugin-activator');
+        echo '</p>';
     }
 
     /**
      * Render the full options page wrapper.
      *
-     * @return void
      * @since 1.0.0
      */
     public function render_options_page(): void
@@ -184,9 +173,11 @@ class ActivatorOptions
             <h1><?php esc_html_e('Plugin Activator Settings', 'satori-plugin-activator'); ?></h1>
 
             <form method="post" action="options.php">
-                <?php settings_fields('satori_plugin_activator_settings'); ?>
-                <?php do_settings_sections('satori-plugin-activator'); ?>
-                <?php submit_button(); ?>
+                <?php
+                settings_fields('satori_plugin_activator_settings');
+                do_settings_sections('satori-plugin-activator');
+                submit_button();
+                ?>
             </form>
         </div>
         <?php
@@ -195,18 +186,16 @@ class ActivatorOptions
     /**
      * Check if the activator is currently disabled via the option.
      *
-     * @return bool True if the activator should be disabled, false otherwise.
      * @since 1.0.0
      */
     public function is_disabled(): bool
     {
-        return (bool) get_option($this->option_name, false);
+        return (bool) get_option(self::OPTION_NAME, false);
     }
 
     /**
      * Output styles only if on the correct page.
      *
-     * @return void
      * @since 1.0.0
      */
     public function maybe_output_styles(): void
@@ -221,19 +210,17 @@ class ActivatorOptions
     /**
      * Check if currently on the plugin activator settings page.
      *
-     * @return bool True if on settings page.
      * @since 1.0.0
      */
     private function is_settings_page(): bool
     {
-        $screen = get_current_screen();
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
         return $screen && $screen->id === 'settings_page_satori-plugin-activator';
     }
 
     /**
      * Output CSS styles for the toggle switch.
      *
-     * @return void
      * @since 1.0.0
      */
     private function output_toggle_styles(): void
@@ -269,7 +256,7 @@ class ActivatorOptions
                 width: 18px;
                 left: 3px;
                 bottom: 3px;
-                background-color: white;
+                background-color: #fff;
                 transition: 0.3s;
                 border-radius: 50%;
             }
