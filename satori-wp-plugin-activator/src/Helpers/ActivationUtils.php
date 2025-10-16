@@ -43,10 +43,18 @@ final class ActivationUtils
      */
     private static ?array $plugin_cache = null;
 
+    /**
+     * Log prefix for consistent error_log output.
+     *
+     * @var string
+     * @since 1.0.0
+     */
     private const LOG_PREFIX = '[PluginActivator]';
 
     /**
      * Ensure WordPress plugin API is loaded.
+     *
+     * Loads wp-admin includes if necessary for plugin functions.
      *
      * @return void
      * @since 1.0.0
@@ -120,8 +128,8 @@ final class ActivationUtils
     /**
      * Add a normalized plugin spec.
      *
-     * @param array $specs Reference.
-     * @param array $maybe Candidate spec.
+     * @param array $specs Reference to the collection array.
+     * @param array $maybe Candidate plugin spec.
      * @return void
      * @since 1.0.0
      */
@@ -143,8 +151,8 @@ final class ActivationUtils
     /**
      * Process nested plugin structures.
      *
-     * @param array $specs Reference.
-     * @param array $item Item data.
+     * @param array $specs Reference to the collection array.
+     * @param array $item  Item possibly containing nested plugins.
      * @return void
      * @since 1.0.0
      */
@@ -167,7 +175,7 @@ final class ActivationUtils
     /**
      * Process a plugin array.
      *
-     * @param array $specs Reference.
+     * @param array $specs   Reference to the collection array.
      * @param array $plugins Plugin list.
      * @return void
      * @since 1.0.0
@@ -187,7 +195,7 @@ final class ActivationUtils
      * Extract plugin file paths.
      *
      * @param array $input Mixed specs.
-     * @return array<int, string>
+     * @return array<int, string> List of unique plugin file paths.
      * @since 1.0.0
      */
     private static function extract_files(array $input): array
@@ -204,8 +212,8 @@ final class ActivationUtils
     /**
      * Check plugin file existence.
      *
-     * @param string $file Plugin file.
-     * @return bool
+     * @param string $file Plugin file path relative to WP_PLUGIN_DIR.
+     * @return bool True if file exists, false otherwise.
      * @since 1.0.0
      */
     public static function plugin_file_exists(string $file): bool
@@ -216,8 +224,8 @@ final class ActivationUtils
     /**
      * Get plugin version.
      *
-     * @param string $file Plugin file.
-     * @return string|null
+     * @param string $file Plugin file path relative to WP_PLUGIN_DIR.
+     * @return string|null Plugin version string or null if unavailable.
      * @since 1.0.0
      */
     public static function get_plugin_version(string $file): ?string
@@ -230,9 +238,9 @@ final class ActivationUtils
     /**
      * Compare versions with an expression.
      *
-     * @param string      $current Current version.
-     * @param string|null $required_expr Expression.
-     * @return bool
+     * @param string      $current       Current version.
+     * @param string|null $required_expr Expression like ">=1.0.0".
+     * @return bool True if condition satisfied.
      * @since 1.0.0
      */
     public static function satisfies_version(string $current, ?string $required_expr): bool
@@ -299,10 +307,10 @@ final class ActivationUtils
     }
 
     /**
-     * Validate batch.
+     * Validate batch of plugin specs.
      *
-     * @param array $specs Specs.
-     * @return array{immediate:array,deferred:array}
+     * @param array $specs Normalized specs.
+     * @return array{immediate:array,deferred:array} Grouped lists.
      * @since 1.0.0
      */
     private static function validate_plugin_batch(array $specs): array
@@ -318,7 +326,14 @@ final class ActivationUtils
             }
 
             $version_expr = $spec['version'] ?? null;
-            if ($version_expr && !self::validate_plugin_version_constraint($spec['file'], $version_expr, $all_plugins)) {
+            if (
+                $version_expr &&
+                !self::validate_plugin_version_constraint(
+                    $spec['file'],
+                    $version_expr,
+                    $all_plugins
+                )
+            ) {
                 self::handle_version_constraint_failure($spec['file']);
                 continue;
             }
@@ -335,6 +350,12 @@ final class ActivationUtils
 
     /**
      * Validate plugin version constraint.
+     *
+     * @param string $file Plugin file path relative to WP_PLUGIN_DIR.
+     * @param string $expr Version constraint expression (e.g. '>=1.0.0').
+     * @param array  $all  Cached plugin data from WordPress.
+     * @return bool True if constraint satisfied.
+     * @since 1.0.0
      */
     private static function validate_plugin_version_constraint(
         string $file,
@@ -346,7 +367,12 @@ final class ActivationUtils
     }
 
     /**
-     * Missing plugin handler.
+     * Handle missing plugin file.
+     *
+     * @param string $file     Plugin file path relative to WP_PLUGIN_DIR.
+     * @param bool   $required Whether the plugin is required.
+     * @return void
+     * @since 1.0.0
      */
     private static function handle_missing_plugin_file(string $file, bool $required): void
     {
@@ -357,7 +383,11 @@ final class ActivationUtils
     }
 
     /**
-     * Version constraint failure.
+     * Handle version constraint failure.
+     *
+     * @param string $file Plugin file path relative to WP_PLUGIN_DIR.
+     * @return void
+     * @since 1.0.0
      */
     private static function handle_version_constraint_failure(string $file): void
     {
@@ -368,7 +398,11 @@ final class ActivationUtils
     }
 
     /**
-     * Activate plugin list.
+     * Activate a list of plugins.
+     *
+     * @param array<int, string> $files Plugin files to activate.
+     * @return void
+     * @since 1.0.0
      */
     private static function process_activations(array $files): void
     {
@@ -408,7 +442,12 @@ final class ActivationUtils
     }
 
     /**
-     * Version check wrapper.
+     * Check if a plugin version satisfies a given constraint.
+     *
+     * @param string $file       Plugin file path relative to WP_PLUGIN_DIR.
+     * @param string $constraint Version constraint (e.g. '>=1.0.0').
+     * @return bool True if satisfied, false otherwise.
+     * @since 1.0.0
      */
     public static function check_version(string $file, string $constraint): bool
     {
@@ -426,7 +465,11 @@ final class ActivationUtils
     }
 
     /**
-     * Missing plugin check.
+     * Check if a plugin file is missing.
+     *
+     * @param string $plugin_file Plugin file path relative to WP_PLUGIN_DIR.
+     * @return bool True if missing, false otherwise.
+     * @since 1.0.0
      */
     public static function is_plugin_file_missing(string $plugin_file): bool
     {
@@ -434,7 +477,13 @@ final class ActivationUtils
     }
 
     /**
-     * Log version mismatch.
+     * Log a version mismatch warning.
+     *
+     * @param string      $file     Plugin file path relative to WP_PLUGIN_DIR.
+     * @param string      $required Required version expression.
+     * @param string|null $current  Current plugin version (auto-detected if null).
+     * @return void
+     * @since 1.0.0
      */
     public static function log_version_mismatch(
         string $file,
@@ -452,7 +501,11 @@ final class ActivationUtils
     }
 
     /**
-     * Log missing required plugin.
+     * Log missing required plugin warning.
+     *
+     * @param string $file Plugin file path relative to WP_PLUGIN_DIR.
+     * @return void
+     * @since 1.0.0
      */
     public static function log_missing_plugin(string $file): void
     {
