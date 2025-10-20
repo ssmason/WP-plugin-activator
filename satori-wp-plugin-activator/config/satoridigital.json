@@ -1,0 +1,103 @@
+{
+  "plugins": [
+    
+    {
+      "file": "services-gallery/services-gallery.php",
+      "required": true,
+      "version": ">=1.0",
+      "order": 10,
+      "defer": false
+    },
+   
+    {
+      "file": "force-regenerate-thumbnails/force-regenerate-thumbnails.php",
+      "required": true,
+      "version": ">=2.2.2",
+      "order": 10,
+      "defer": false
+    },
+    {
+      "file": "jetpack/jetpack.php",
+      "required": true,
+      "version": ">=3.1.13",
+      "order": 10,
+      "defer": false
+    },
+   
+    {
+      "file": "ultimate-addons-for-gutenberg/ultimate-addons-for-gutenberg.php",
+      "required": true,
+      "version": ">=2.19.11",
+      "order": 10,
+      "defer": true
+    }
+  ],
+
+  "filtered": [
+     {
+      "hook": "init",
+      "priority": 20,
+      "plugins": [
+        {
+          "file": "wordpress-seo/wp-seo.php",
+          "required": true,
+          "version": ">=25.9",
+          "order": 10,
+          "defer": false
+        }
+      ]
+    }
+  ],
+
+  "settings": [
+     {
+      "field": "enable_query_monitor",
+      "operator": "equals",
+      "value": "1",
+      "plugins": [
+         {
+          "file":  "query-monitor/query-monitor.php",
+          "required": true,
+          "version": ">=3.19.0",
+          "order": 10,
+          "defer": false
+        }
+      ]
+    },
+    {
+      "field": "enable_query_monitor",
+      "operator": "equals",
+      "value": "1",
+      "plugins": [
+         {
+          "file": "contact-form-7/wp-contact-form-7.php",
+          "required": true,
+          "version": ">=5.19.0",
+          "order": 10,
+          "defer": false
+        }
+      ]
+    }
+  ],
+
+  "deactivate": [
+    ""
+  ],
+
+  "groups": {
+   "staging": {
+      "url": "https://satori-digital.com",
+      "plugins": [
+        {
+          "file": "gutenberg/gutenberg.php",
+          "required": true,
+          "version": ">=21.3.0",
+          "order": 10,
+          "defer": false
+        }
+   
+      ]
+    }
+  
+  }
+}

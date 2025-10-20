@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<ruleset name="SatoriDigitalPluginActivator">
+    <description>PHPCS configuration without conflicting control structure rules</description>
+    
+    <file>src/</file>
+
+    <!-- PSR12 for modern PHP -->
+    <rule ref="PSR12">
+        <severity>5</severity>
+        <!-- Allow snake_case methods for WordPress compatibility -->
+        <exclude name="PSR1.Methods.CamelCapsMethodName"/>
+        <!-- Exclude the problematic file header spacing rule -->
+        <exclude name="PSR12.Files.FileHeader.SpacingAfterBlock"/>
+    </rule>
+
+    <!-- WordPress Documentation (but exclude file comment rules) -->
+    <rule ref="WordPress-Docs">
+        <severity>5</severity>
+        <!-- EXCLUDE ALL conflicting Squiz file comment rules -->
+        <exclude name="Squiz.Commenting.FileComment"/>
+        <!-- EXCLUDE conflicting control structure spacing -->
+        <exclude name="Squiz.WhiteSpace.ControlStructureSpacing.SpacingAfterOpenBrace"/>
+    </rule>
+
+    <!-- WordPress Security -->
+    <rule ref="WordPress.Security">
+        <severity>10</severity>
+    </rule>
+
+    <!-- WordPress naming conventions -->
+    <rule ref="WordPress.NamingConventions.ValidFunctionName">
+        <severity>5</severity>
+    </rule>
+    
+    <rule ref="WordPress.NamingConventions.ValidVariableName">
+        <severity>5</severity>
+    </rule>
+
+    <!-- Allow short arrays -->
+    <rule ref="Universal.Arrays.DisallowShortArraySyntax">
+        <severity>0</severity>
+    </rule>
+
+    <!-- Simple alignment -->
+    <rule ref="Generic.Formatting.MultipleStatementAlignment">
+        <severity>4</severity>
+    </rule>
+
+    <arg name="extensions" value="php"/>
+    <arg value="sp"/>
+    <arg name="colors"/>
+</ruleset>

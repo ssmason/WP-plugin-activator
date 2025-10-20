@@ -1,0 +1,100 @@
+{
+  "plugins": [
+    {
+      "file": "classic-editor/classic-editor.php",
+      "required": true,
+      "version": ">=1.6",
+      "order": 5
+    },
+    {
+      "file": "wordpress-seo/wp-seo.php",
+      "required": false,
+      "version": ">=21.0",
+      "order": 15
+    },
+    {
+      "file": "query-monitor/query-monitor.php",
+      "required": false,
+      "order": 50
+    }
+  ],
+
+  "filtered": [
+    {
+      "hook": "init",
+      "priority": 20,
+      "plugins": [
+        {
+          "file": "acf-pro/acf.php",
+          "required": true,
+          "version": ">=6.0"
+        }
+      ]
+    },
+    {
+      "hook": "template_redirect",
+      "priority": 15,
+      "plugins": [
+        "redirection/redirection.php"
+      ]
+    }
+  ],
+
+  "settings": [
+    {
+      "field": "enable_debug_mode",
+      "operator": "equals",
+      "value": "yes",
+      "plugins": [
+        {
+          "file": "debug-bar/debug-bar.php",
+          "required": false,
+          "order": 10
+        }
+      ]
+    },
+    {
+      "field": "maintenance_mode",
+      "operator": "not_equals",
+      "value": "on",
+      "plugins": [
+        "cache-enabler/cache-enabler.php"
+      ]
+    }
+  ],
+
+  "groups": {
+    "staging": {
+      "url": "https://staging.example.com",
+      "plugins": [
+        {
+          "file": "query-monitor/query-monitor.php",
+          "required": false,
+          "version": ">=3.12",
+          "order": 3
+        },
+        {
+          "file": "wp-mail-logging/wp-mail-logging.php",
+          "required": false,
+          "order": 7
+        }
+      ]
+    },
+    "production": {
+      "url": "https://example.com",
+      "plugins": [
+        {
+          "file": "object-cache-pro/object-cache-pro.php",
+          "required": true,
+          "version": ">=1.18",
+          "order": 10
+        },
+        {
+          "file": "wp-rocket/wp-rocket.php",
+          "required": false,
+          "order": 20
+        }
+      ]
+    }
+  }
+}

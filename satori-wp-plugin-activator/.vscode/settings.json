@@ -1,0 +1,13 @@
+{
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false,
+    "[php]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4
+    },
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "php.validate.enable": true,
+    "php.suggest.basic": false
+}

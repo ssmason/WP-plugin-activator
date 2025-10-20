@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php"
+         colors="true"
+         verbose="true"
+         testdox="true">
+  <testsuites>
+    <testsuite name="Theme Tests">
+      <directory suffix="Test.php">tests/</directory>
+    </testsuite>
+  </testsuites>
+  <php>
+    <!-- Defaults (can be overridden by .env.testing that we load in bootstrap.php) -->
+    <env name="WP_TESTS_DIR" value=".wp-tests/wp-tests-lib" />
+    <env name="WP_CORE_DIR"  value=".wp-tests/wordpress" />
+  </php>
+</phpunit>
