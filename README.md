@@ -21,6 +21,9 @@ A comprehensive WordPress MU plugin management system that automates plugin acti
 
 Create a JSON configuration file with your plugin specifications:
 
+The name of the file will be the name of your theme : 
+**config/[theme-name].json**
+
 ```json
 {
   "plugins": [
