@@ -163,14 +163,29 @@ class ActivatorOptions
 
     /**
      * Render the full options page wrapper.
+     * Only allow access for users with the 'administrator' role or super-admin
      *
      * @since 1.0.0
      */
     public function render_options_page(): void
     {
+        $user = wp_get_current_user();
+        $is_admin = in_array('administrator', (array) $user->roles, true);
+        $is_super_admin = is_super_admin();
+
+        if (!$is_admin && !$is_super_admin) {
+            wp_die(
+                esc_html__(
+                    'You do not have sufficient permissions to access this page.',
+                    'satori-plugin-activator'
+                )
+            );
+        }
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e('Plugin Activator Settings', 'satori-plugin-activator'); ?></h1>
+            <h1>
+                <?php esc_html_e('Plugin Activator Settings', 'satori-plugin-activator'); ?>
+            </h1>
 
             <form method="post" action="options.php">
                 <?php
@@ -179,6 +194,42 @@ class ActivatorOptions
                 submit_button();
                 ?>
             </form>
+
+            <?php
+            // Render theme config JSON.
+            $theme_slug = (string) get_option('stylesheet', '');
+            $config_dir = defined('PLUGIN_ACTIVATION_CONFIG')
+                ? PLUGIN_ACTIVATION_CONFIG
+                : WP_CONTENT_DIR . '/private/plugin-config';
+            $config_file = trailingslashit($config_dir) . $theme_slug . '.json';
+            if (file_exists($config_file)) {
+                $json_data = json_decode(file_get_contents($config_file), true);
+                if (is_array($json_data)) {
+                    echo '<h2>'
+                        . esc_html__('Currrent ', 'satori-plugin-activator')
+                        . esc_html($theme_slug)
+                        . esc_html__(' Plugin Config', 'satori-plugin-activator')
+                        . '</h2>';
+                    echo '<pre style="background:#f6f6f6;'
+                        . 'padding:1em;'
+                        . 'border-radius:4px;'
+                        . 'max-height:400px;'
+                        . 'overflow:auto;">';
+                    $json_pretty = json_encode($json_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                    echo esc_html($json_pretty);
+                    echo '</pre>';
+                } else {
+                    echo '<p class="error">'
+                        . esc_html__('Invalid JSON in config file.', 'satori-plugin-activator')
+                        . '</p>';
+                }
+            } else {
+                echo '<p class="error">'
+                    . esc_html__('Config file not found: ', 'satori-plugin-activator')
+                    . esc_html($config_file)
+                    . '</p>';
+            }
+            ?>
         </div>
         <?php
     }
