@@ -1,4 +1,7 @@
 /vendor
 /bin
+/.wp-tests
+/.vscode
+
 
 .DS_Store

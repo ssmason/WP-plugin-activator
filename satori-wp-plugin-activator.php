@@ -7,10 +7,13 @@
  */
 
 
-if ( ! defined( 'PLUGIN_ACTIVATION_CONFIG' ) ) {
-	define( 'PLUGIN_ACTIVATION_CONFIG', __DIR__ . '/satori-wp-plugin-activator/config' );
-}
 
+if ( ! defined( 'PLUGIN_ACTIVATION_CONFIG' ) ) {
+	define(
+		'PLUGIN_ACTIVATION_CONFIG',
+		( defined( 'WPCOM_VIP_PRIVATE_DIR' ) ? WPCOM_VIP_PRIVATE_DIR : WP_CONTENT_DIR . '/private' ) . '/plugin-config'
+	);
+}
 if ( file_exists( __DIR__ . '/satori-wp-plugin-activator/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/satori-wp-plugin-activator/vendor/autoload.php';
 }
