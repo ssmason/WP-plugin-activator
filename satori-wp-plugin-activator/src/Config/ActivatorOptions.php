@@ -163,11 +163,18 @@ class ActivatorOptions
 
     /**
      * Render the full options page wrapper.
-     *
+     * Only allow access for users with the 'administrator' role or super-admin
      * @since 1.0.0
      */
     public function render_options_page(): void
     {
+        $user = wp_get_current_user();
+        $is_admin = in_array('administrator', (array) $user->roles, true);
+        $is_super_admin = is_super_admin();
+
+        if (!$is_admin && !$is_super_admin) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'satori-plugin-activator'));
+        }
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Plugin Activator Settings', 'satori-plugin-activator'); ?></h1>
