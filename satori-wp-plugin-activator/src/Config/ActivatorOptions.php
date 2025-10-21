@@ -186,6 +186,24 @@ class ActivatorOptions
                 submit_button();
                 ?>
             </form>
+
+            <?php
+            // Render theme config JSON
+            $theme_slug = (string) get_option('stylesheet', '');
+            $config_dir = defined('PLUGIN_ACTIVATION_CONFIG') ? PLUGIN_ACTIVATION_CONFIG : WP_CONTENT_DIR . '/private/plugin-config';
+            $config_file = trailingslashit($config_dir) . $theme_slug . '.json';
+            if (file_exists($config_file)) {
+                $json_data = json_decode(file_get_contents($config_file), true);
+                if (is_array($json_data)) {
+                    echo '<h2> Currrent '. esc_html($theme_slug) . ' Plugin Config</h2>';
+                    echo '<pre style="background:#f6f6f6;padding:1em;border-radius:4px;max-height:400px;overflow:auto;">' . esc_html(json_encode($json_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) . '</pre>';
+                } else {
+                    echo '<p class="error">Invalid JSON in config file.</p>';
+                }
+            } else {
+                echo '<p class="error">Config file not found: ' . esc_html($config_file) . '</p>';
+            }
+            ?>
         </div>
         <?php
     }
