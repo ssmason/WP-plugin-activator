@@ -71,7 +71,7 @@ final class ConfigLoader
     private function get_json_config(string $key): array
     {
         $file = trailingslashit(PLUGIN_ACTIVATION_CONFIG) . $key . '.json';
-
+        
         if (!file_exists($file)) {
             error_log(sprintf('%s Config file not found: %s', self::LOG_PREFIX, $file));
             return [];

@@ -8,7 +8,7 @@
 
 
 if ( ! defined( 'PLUGIN_ACTIVATION_CONFIG' ) ) {
-	define( 'PLUGIN_ACTIVATION_CONFIG', __DIR__ . '/satori-wp-plugin-activator/config' );
+	define( 'PLUGIN_ACTIVATION_CONFIG', WP_CONTENT_DIR . '/private/plugin-config' );
 }
 
 if ( file_exists( __DIR__ . '/satori-wp-plugin-activator/vendor/autoload.php' ) ) {
